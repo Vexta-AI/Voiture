@@ -121,6 +121,7 @@ Apify (fin de run) → /api/hunt/ingest → relit le run chez Apify → normalis
   → scoring → outreach → alerte Telegram (anti-doublon) → stockage Vercel Blob → dashboard en direct
 ```
 
+- **Modèles** : le radar scanne tous les véhicules de la zone dans le budget ; les modèles ciblés (top ventes VO : Clio, C3, 208, 2008, Sandero, Captur, Yaris, 308, 3008, Mégane, Duster, Corsa, Polo, Golf, Tesla, Classe A, A3 ; motos : MT-07/09, Z650/800/900, GS, Ténéré 700, T-Max, X-ADV, CB650, Africa Twin, Triumph, SV650) ont en plus des recherches de comparables pour fiabiliser la cote.
 - **Zone** : 200 km autour de la Gironde (44.901, -0.740) par défaut, voitures (catégorie 2) et motos (catégorie 3) séparément. Modifiable avec `HUNT_AREA=lat,lng,rayonKm`.
 - **Recherches** : `fresh` chaque jour (dernières annonces, alertes PÉPITE) ; chaque lundi, `stale` (annonces les plus anciennes, cibles Mandat J+15) et `market` (recherches larges par modèle, pour la cote).
 - **Cote** : médiane des annonces comparables (même modèle, ±1 an et ±35 % de km, puis ±2 ans et ±60 %), 4 comparables minimum, 10 % d'extrêmes retirés au-delà de 10. Pas assez de comparables = pas de cote = pas d'alerte : aucune marge n'est inventée.
@@ -130,7 +131,7 @@ Apify (fin de run) → /api/hunt/ingest → relit le run chez Apify → normalis
 - **Dashboard privé** : `DASHBOARD_PASSWORD` protège tout le site (y compris l'URL de production courte, que la protection Vercel ne couvre pas). La protection Vercel (connexion à ton compte) reste active sur les autres URLs `*.vercel.app`. Le webhook Apify la traverse grâce au jeton « Protection Bypass for Automation » (variable `VERCEL_AUTOMATION_BYPASS_SECRET`, fournie par Vercel). Pour appeler `/api/outreach` depuis un outil externe, ajoute l'en-tête `x-vercel-protection-bypass: <ce jeton>`.
 - **Envoi au vendeur** : manuel, depuis Telegram. LeBonCoin n'a pas d'API de messagerie et bannit les envois automatisés.
 - **Fréquence** : le plan Vercel Hobby limite les crons à 1 par jour. Pour plus de passages, passe en Pro et change `schedule` dans `vercel.json` (ex. `0 6-21/2 * * *`), ou appelle `/api/hunt/start` depuis un planificateur externe avec l'en-tête `Authorization: Bearer <CRON_SECRET>`.
-- **Coût** : réglages par défaut ≈ 3 000 annonces/mois en quotidien + ≈ 2 700 en hebdo, soit environ 8 à 16 $/mois au tarif affiché du scraper (1,50 à 2,91 $ / 1 000), plus la bande passante du proxy résidentiel. Le plan gratuit Apify (5 $ de crédit/mois) suffit pour tester ; au-delà, compter le plan Starter. Baisse `HUNT_MAX_ITEMS` / `HUNT_MARKET_MAX_ITEMS` pour réduire. Vérifie le prix en vigueur sur la page du scraper `bovi/leboncoin-listings`.
+- **Coût** : réglages par défaut ≈ 3 000 annonces/mois en quotidien + ≈ 5 000 en hebdo (36 recherches de comparables), soit environ 12 à 23 $/mois au tarif affiché du scraper (1,50 à 2,91 $ / 1 000), plus la bande passante du proxy résidentiel. Le plan gratuit Apify (5 $ de crédit/mois) suffit pour tester ; au-delà, compter le plan Starter. Baisse `HUNT_MAX_ITEMS` / `HUNT_MARKET_MAX_ITEMS` pour réduire. Vérifie le prix en vigueur sur la page du scraper `bovi/leboncoin-listings`.
 
 **Tes propres recherches** : fais ta recherche sur leboncoin.fr (zone, prix, tri « plus récentes »), copie l'URL, puis renseigne `HUNT_SOURCES` :
 
