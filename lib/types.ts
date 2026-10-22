@@ -28,6 +28,10 @@ export interface Listing {
   location?: string;
   source?: string;
   url?: string;
+  /** Coordonnées GPS et code postal (annonces réelles) */
+  lat?: number;
+  lng?: number;
+  zip?: string;
 }
 
 export type Analysis = ReturnType<typeof scoreListing>;

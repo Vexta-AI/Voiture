@@ -4,10 +4,11 @@ import { randomUUID } from 'node:crypto';
 
 import { getDatasetItems, getRun, isCapacityError, startRun } from '@/backend/pipeline/apify.js';
 import { priceListings, selectAlerts } from '@/backend/pipeline/hunt.js';
+import { filterArea } from '@/backend/pipeline/geo.js';
 import { dedupeById } from '@/backend/pipeline/market.js';
 import { normalizeApifyItem } from '@/backend/pipeline/normalize.js';
 import { formatTelegramAlert, sendTelegram } from '@/backend/pipeline/telegram.js';
-import { HUNT_LIMITS, defaultSources, parseArea, parseTypes, type HuntSource } from '@/backend/config/sources.js';
+import { DEFAULT_AREA, HUNT_LIMITS, defaultSources, parseArea, parseTypes, type HuntSource } from '@/backend/config/sources.js';
 
 import { alertAlreadySent, claimSource, loadBatch, loadRuns, markAlertSent, pruneRuns, releaseSource, saveBatch, saveRun, storeEnabled } from './store';
 import type { Listing } from './types';
@@ -163,8 +164,12 @@ export async function ingestRun(runId: string, sourceKey: string) {
   const summary = { ok: true as const, source: source.key, kind: source.kind, items: items.length, listings: listings.length, rejected, priced: 0, unpriced: 0, alerts: 0, skippedDuplicates: 0, alertErrors: 0 };
   if (source.kind === 'market') return summary;
 
+  // Le scraper n'applique pas toujours le rayon : seules les annonces vérifiées dans la zone sont chassées
+  // (toutes restent dans le stock de comparables).
+  const { kept, stats } = filterArea(listings, config.area ?? DEFAULT_AREA);
+  Object.assign(summary, { area: stats });
   const pool = dedupeById((await loadRuns(HUNT_LIMITS.retentionDays)).flatMap((r) => r.listings));
-  const { priced, unpriced } = priceListings(listings, pool);
+  const { priced, unpriced } = priceListings(kept, pool);
   summary.priced = priced.length;
   summary.unpriced = unpriced;
 
@@ -198,7 +203,8 @@ async function computeLive() {
   const runs = await loadRuns(HUNT_LIMITS.retentionDays);
   const pool = dedupeById(runs.flatMap((r) => r.listings));
   const recentSince = Date.now() - 3 * 86_400_000;
-  const recent = dedupeById(runs.filter((r) => r.kind !== 'market' && new Date(r.fetchedAt).getTime() >= recentSince).flatMap((r) => r.listings));
+  const recentAll = dedupeById(runs.filter((r) => r.kind !== 'market' && new Date(r.fetchedAt).getTime() >= recentSince).flatMap((r) => r.listings));
+  const recent = filterArea(recentAll, huntConfig().area ?? DEFAULT_AREA).kept;
   const { priced, unpriced } = priceListings(recent, pool);
   const lastRun = runs.filter((r) => r.kind !== 'market').at(-1)?.fetchedAt ?? null;
   return { listings: priced.map((p) => p.listing as Listing), unpriced, poolSize: pool.length, lastRun };

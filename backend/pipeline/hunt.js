@@ -5,7 +5,7 @@
 
 import { buildOutreachPayload } from '../utils/outreach.js';
 import { scoreListing } from '../utils/scoring.js';
-import { estimateMarketPrice } from './market.js';
+import { MARKET_RULES, estimateMarketPrice } from './market.js';
 
 /** Alertes max par run : au-delà, c'est que la cote est faussée, pas que le marché déborde de pépites. */
 export const MAX_ALERTS_PER_RUN = 10;
@@ -47,7 +47,8 @@ export function selectAlerts(priced, options = {}) {
       const payload = buildOutreachPayload(listing, analysis, { now });
       return { listing, market, analysis, payload };
     })
-    .filter((c) => c.payload.ok)
+    // Un prix sous 50 % de la cote est un signal d'arnaque ou de cote faussée, pas une pépite.
+    .filter((c) => c.payload.ok && c.listing.price >= c.listing.marketPrice * MARKET_RULES.suspiciousRatio)
     .sort((a, b) => b.analysis.score - a.analysis.score)
     .slice(0, options.maxAlerts ?? MAX_ALERTS_PER_RUN)
     .map((c) => ({ ...c, key: alertKey(c.listing.id, c.payload.ok ? c.payload.strategy : 'none', c.listing.price) }));

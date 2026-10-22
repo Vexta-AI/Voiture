@@ -17,6 +17,11 @@ export function toInt(value) {
   return digits ? Number(digits[0]) : null;
 }
 
+function toCoord(value) {
+  const n = typeof value === 'string' ? Number(value) : value;
+  return typeof n === 'number' && Number.isFinite(n) ? n : undefined;
+}
+
 function attr(item, ...keys) {
   const map = item.attributes_map ?? {};
   for (const key of keys) {
@@ -104,6 +109,9 @@ export function normalizeApifyItem(item, context) {
       location: city ? `${city}${zip ? ` (${String(zip).slice(0, 2)})` : ''}` : undefined,
       source: item.owner_type === 'pro' ? 'LeBonCoin · Pro' : 'LeBonCoin · Particulier',
       url: item.url ?? undefined,
+      lat: toCoord(item.location_lat ?? item.lat),
+      lng: toCoord(item.location_lng ?? item.lng),
+      zip: zip ? String(zip) : undefined,
     },
   };
 }
