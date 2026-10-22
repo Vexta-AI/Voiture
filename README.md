@@ -22,6 +22,7 @@ Déploiement Vercel : importer le repo, aucun réglage requis. Variables optionn
 | `CRON_SECRET` / `INGEST_SECRET` | secrets du cron et du webhook Apify (générés à la création du projet) |
 | `BLOB_READ_WRITE_TOKEN` | stockage Vercel Blob (posé par l'intégration Blob) |
 | `HUNT_AREA`, `HUNT_MAX_ITEMS`, `HUNT_MARKET_MAX_ITEMS`, `APIFY_MAX_CHARGE_USD`, `HUNT_SOURCES` | réglages de la chasse (optionnels) |
+| `DASHBOARD_PASSWORD` | protège tout le site par mot de passe (identifiant libre) ; `/api/hunt/*` garde ses propres secrets |
 | `ANTHROPIC_API_KEY` | active « Affiner avec l'IA » dans l'éditeur de messages |
 | `OUTREACH_API_KEY` | clé exigée (en-tête `x-api-key`) pour pousser un payload vers Make |
 | `MAKE_WEBHOOK_URL` | URL du webhook Make.com qui reçoit les payloads `dispatch` |
@@ -125,7 +126,7 @@ Apify (fin de run) → /api/hunt/ingest → relit le run chez Apify → normalis
 - **Cote** : médiane des annonces comparables (même modèle, ±1 an et ±35 % de km, puis ±2 ans et ±60 %), 4 comparables minimum, 10 % d'extrêmes retirés au-delà de 10. Pas assez de comparables = pas de cote = pas d'alerte : aucune marge n'est inventée.
 - **Alertes** : 10 max par run, triées par score. Une annonce déjà signalée ne l'est plus, sauf baisse de prix.
 - **Sécurité** : le cron exige `CRON_SECRET`, le webhook exige `INGEST_SECRET`, et seul l'id du run est lu dans le webhook (les annonces sont relues chez Apify avec notre token).
-- **Dashboard privé** : la protection Vercel (connexion à ton compte) reste active sur les URLs `*.vercel.app`. Le webhook Apify la traverse grâce au jeton « Protection Bypass for Automation » (variable `VERCEL_AUTOMATION_BYPASS_SECRET`, fournie par Vercel). Pour appeler `/api/outreach` depuis un outil externe, ajoute l'en-tête `x-vercel-protection-bypass: <ce jeton>`.
+- **Dashboard privé** : `DASHBOARD_PASSWORD` protège tout le site (y compris l'URL de production courte, que la protection Vercel ne couvre pas). La protection Vercel (connexion à ton compte) reste active sur les autres URLs `*.vercel.app`. Le webhook Apify la traverse grâce au jeton « Protection Bypass for Automation » (variable `VERCEL_AUTOMATION_BYPASS_SECRET`, fournie par Vercel). Pour appeler `/api/outreach` depuis un outil externe, ajoute l'en-tête `x-vercel-protection-bypass: <ce jeton>`.
 - **Envoi au vendeur** : manuel, depuis Telegram. LeBonCoin n'a pas d'API de messagerie et bannit les envois automatisés.
 - **Fréquence** : le plan Vercel Hobby limite les crons à 1 par jour. Pour plus de passages, passe en Pro et change `schedule` dans `vercel.json` (ex. `0 6-21/2 * * *`), ou appelle `/api/hunt/start` depuis un planificateur externe avec l'en-tête `Authorization: Bearer <CRON_SECRET>`.
 - **Coût** : réglages par défaut ≈ 3 000 annonces/mois en quotidien + ≈ 2 700 en hebdo, soit environ 8 à 16 $/mois au tarif affiché du scraper (1,50 à 2,91 $ / 1 000), plus la bande passante du proxy résidentiel. Le plan gratuit Apify (5 $ de crédit/mois) suffit pour tester ; au-delà, compter le plan Starter. Baisse `HUNT_MAX_ITEMS` / `HUNT_MARKET_MAX_ITEMS` pour réduire. Vérifie le prix en vigueur sur la page du scraper `bovi/leboncoin-listings`.
