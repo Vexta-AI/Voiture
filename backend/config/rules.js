@@ -85,7 +85,10 @@ export const SEGMENT_RULES = [
   },
   {
     segment: 'compacte',
-    patterns: ['golf', '308', 'megane', 'leon', 'focus', 'octavia', 'astra', 'c4', 'auris', 'corolla', 'i30', 'ceed'],
+    patterns: [
+      'golf', '308', 'megane', 'leon', 'focus', 'octavia', 'astra', 'c4', 'auris', 'corolla', 'i30', 'ceed',
+      'peugeot2008', 'peugeot3008', 'captur', 'duster', 'tiguan', 'qashqai', 'kadjar', 'arkana',
+    ],
   },
 ];
 
@@ -106,6 +109,17 @@ export const AUTO_TARGETS = [
   { id: 'twingo', label: 'Twingo', brands: ['renault'], patterns: ['twingo'], cursus: true },
   { id: 'classea', label: 'Classe A', brands: ['mercedes', 'mercedesbenz'], patterns: ['classea', 'a180', 'a200', 'a220', 'a250', 'a35'], cursus: true },
   { id: 'a3', label: 'A3 / S3', brands: ['audi'], patterns: ['a3', 's3'], cursus: true },
+  // Volumes et liquidité du marché de l'occasion (top ventes VO France 2025 : Clio, C3, 208, 2008, Sandero, Captur…)
+  { id: 'c3', label: 'C3', brands: ['citroen'], patterns: ['c3'], market: true },
+  { id: 'sandero', label: 'Sandero', brands: ['dacia'], patterns: ['sandero'], market: true },
+  { id: '2008', label: '2008', brands: ['peugeot'], patterns: ['2008'], market: true },
+  { id: 'captur', label: 'Captur', brands: ['renault'], patterns: ['captur'], market: true },
+  { id: 'yaris', label: 'Yaris', brands: ['toyota'], patterns: ['yaris'], market: true },
+  { id: '308', label: '308', brands: ['peugeot'], patterns: ['308'], market: true },
+  { id: '3008', label: '3008', brands: ['peugeot'], patterns: ['3008'], market: true },
+  { id: 'megane', label: 'Mégane', brands: ['renault'], patterns: ['megane'], market: true },
+  { id: 'duster', label: 'Duster', brands: ['dacia'], patterns: ['duster'], market: true },
+  { id: 'corsa', label: 'Corsa', brands: ['opel'], patterns: ['corsa'], market: true },
 ];
 
 export const MOTO_TARGETS = [
@@ -114,6 +128,15 @@ export const MOTO_TARGETS = [
   { id: 'z800', label: 'Z800e', family: 'Roadster A2', brands: ['kawasaki'], patterns: ['z800'] },
   { id: 'z900', label: 'Z900', family: 'Roadster Full/A2', brands: ['kawasaki'], patterns: ['z900'] },
   { id: 'gs', label: 'BMW GS 1200/1250', family: 'Gros trail', brands: ['bmw'], patterns: ['r1200gs', 'r1250gs', '1200gs', '1250gs', 'gsadventure'] },
+  // Modèles les plus échangés en occasion (roadsters, trails, maxi-scooters)
+  { id: 'mt09', label: 'MT-09 / Tracer 9', family: 'Roadster Full', brands: ['yamaha'], patterns: ['mt09', 'tracer9', 'tracer900'], market: true },
+  { id: 'tenere', label: 'Ténéré 700', family: 'Trail', brands: ['yamaha'], patterns: ['tenere700', 'tenere'], market: true },
+  { id: 'tmax', label: 'T-Max', family: 'Maxi-scooter', brands: ['yamaha'], patterns: ['tmax'], market: true },
+  { id: 'xadv', label: 'X-ADV', family: 'Maxi-scooter', brands: ['honda'], patterns: ['xadv'], market: true },
+  { id: 'cb650', label: 'CB650R / F', family: 'Roadster A2', brands: ['honda'], patterns: ['cb650'], market: true },
+  { id: 'africatwin', label: 'Africa Twin', family: 'Gros trail', brands: ['honda'], patterns: ['africatwin', 'crf1000', 'crf1100'], market: true },
+  { id: 'triumph', label: 'Trident / Street Triple', family: 'Roadster', brands: ['triumph'], patterns: ['trident', 'streettriple'], market: true },
+  { id: 'sv650', label: 'SV650', family: 'Roadster A2', brands: ['suzuki'], patterns: ['sv650'], market: true },
 ];
 
 // ---------------------------------------------------------------------------
