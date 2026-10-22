@@ -8,7 +8,7 @@
  * Pas assez de comparables = pas de cote = pas de scoring (on n'invente jamais une marge).
  */
 
-import { compact } from '../utils/text.js';
+import { compact, normalize } from '../utils/text.js';
 
 export const MARKET_RULES = {
   /** Comparables minimum pour publier une cote. */
@@ -22,11 +22,34 @@ export const MARKET_RULES = {
   trimFrom: 10,
   /** Arrondi de la cote. */
   step: 50,
+  /** Prix < 50 % de la cote : annonce suspecte (épave, arnaque, erreur de cote) -> jamais d'alerte. */
+  suspiciousRatio: 0.5,
 };
 
-/** Clé de regroupement : type + marque + modèle ("auto:renault:clio5"). */
+/**
+ * Variantes qui changent fortement le prix d'un même modèle : une Golf GTI ne se compare pas
+ * à une Golf, une Clio E-Tech hybride pas à une Clio essence, une MT-10 pas à une MT-07.
+ */
+const VARIANTS = [
+  { id: 'sport', pattern: /\b(gti|gtd|gte|rs|cupra|amg|alpine a110|type r|st line x)\b|golf r\b|\bs3\b|\brs3\b|\bm135|\bm140/ },
+  { id: 'elec', pattern: /\b(electrique|electric|ev|e-tech electrique|zoe|e-208|e-2008|e-c4|id\.3)\b/ },
+  { id: 'hybrid', pattern: /\b(hybride?|e-tech|full hybrid|hev|phev|rechargeable)\b/ },
+];
+
+/** Variante d'une annonce lue dans son titre ("std" par défaut). */
+export function variantOf(listing) {
+  const text = normalize(`${listing.title ?? ''} ${listing.version ?? ''}`);
+  return VARIANTS.find((v) => v.pattern.test(text))?.id ?? 'std';
+}
+
+/**
+ * Clé de regroupement : type + marque + modèle + variante ("auto:volkswagen:golf7:sport").
+ * Le modèle est complété par le motif de cible reconnu dans le titre (ex. "mt10" ≠ "mt07").
+ */
 export function modelKey(listing) {
-  return `${listing.type}:${compact(listing.brand)}:${compact(listing.model)}`;
+  const model = compact(listing.model);
+  const titleModel = listing.type === 'moto' ? compact(listing.title ?? '').match(/mt\d{2}|z\d{3}|r1[02]\d0gs|cb\d{3}/)?.[0] : undefined;
+  return `${listing.type}:${compact(listing.brand)}:${titleModel && !model.includes(titleModel) ? `${model}-${titleModel}` : model}:${variantOf(listing)}`;
 }
 
 function quantile(sorted, q) {

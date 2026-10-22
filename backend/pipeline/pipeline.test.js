@@ -4,7 +4,8 @@ import { describe, it } from 'node:test';
 import { DEFAULT_AREA, defaultSources, parseArea, parseTypes } from '../config/sources.js';
 import { getDatasetItems, isCapacityError, startRun } from './apify.js';
 import { alertKey, priceListings, selectAlerts } from './hunt.js';
-import { estimateMarketPrice, modelKey } from './market.js';
+import { distanceKm, filterArea } from './geo.js';
+import { estimateMarketPrice, modelKey, variantOf } from './market.js';
 import { normalizeApifyItem, toInt } from './normalize.js';
 import { formatTelegramAlert, sendTelegram } from './telegram.js';
 
@@ -98,6 +99,42 @@ describe('Cote par comparables', () => {
     const withOutliers = comps([500, 8800, 8900, 9000, 9000, 9100, 9200, 9300, 9400, 40000]);
     assert.equal(estimateMarketPrice(target, withOutliers)?.price, 9050);
     assert.notEqual(modelKey(target), modelKey(others[0]));
+  });
+});
+
+describe('Zone & variantes (bugs vus en production)', () => {
+  const area = { lat: 44.901, lng: -0.74, radiusKm: 200 };
+
+  it('garde Bordeaux, rejette Paris, la Martinique et les annonces sans GPS', () => {
+    const bordeaux = listing({ ad_id: 1, location_lat: 44.84, location_lng: -0.58 });
+    const paris = listing({ ad_id: 2, location_lat: 48.82, location_lng: 2.21, location_zipcode: '92310' });
+    const martinique = listing({ ad_id: 3, location_lat: 14.79, location_lng: -61.11, location_zipcode: '97218' });
+    const noGps = listing({ ad_id: 4 });
+    const { kept, stats } = filterArea([bordeaux, paris, martinique, noGps], area);
+    assert.deepEqual(kept.map((l) => l.id), ['lbc-1']);
+    assert.deepEqual({ in: stats.inArea, out: stats.outOfArea, none: stats.noCoords }, { in: 1, out: 2, none: 1 });
+    assert.ok(Math.abs(distanceKm({ lat: 44.84, lng: -0.58 }, { lat: 48.86, lng: 2.35 }) - 500) < 15);
+  });
+
+  it('ne compare pas une Golf GTI à une Golf, ni une Clio hybride à une Clio essence', () => {
+    const gti = listing({ ad_id: 5, title: 'Volkswagen Golf 7 GTI Performance', vehicle_brand: 'VOLKSWAGEN', vehicle_model: 'Golf' });
+    const golf = listing({ ad_id: 6, title: 'Volkswagen Golf 7 1.6 TDI', vehicle_brand: 'VOLKSWAGEN', vehicle_model: 'Golf' });
+    assert.notEqual(modelKey(gti), modelKey(golf));
+    assert.equal(variantOf(listing({ title: 'Renault Clio 5 E-Tech full hybrid 145' })), 'hybrid');
+    assert.equal(variantOf(listing({ title: 'Renault Clio 5 TCe 90' })), 'std');
+  });
+
+  it('ne compare pas une MT-10 à une MT-07', () => {
+    const mt10 = normalizeApifyItem(rawItem({ title: 'Yamaha MT10sp', vehicle_brand: 'Yamaha', vehicle_model: 'MT' }), { type: 'moto' });
+    const mt07 = normalizeApifyItem(rawItem({ title: 'Yamaha MT-07 ABS', vehicle_brand: 'Yamaha', vehicle_model: 'MT' }), { type: 'moto' });
+    assert.ok(mt10.ok && mt07.ok);
+    if (mt10.ok && mt07.ok) assert.notEqual(modelKey(mt10.listing), modelKey(mt07.listing));
+  });
+
+  it('pas d’alerte quand le prix est sous 50 % de la cote (arnaque ou cote faussée)', () => {
+    const suspect = listing({ ad_id: 7, price: 3000 });
+    const { priced } = priceListings([suspect], comps([8700, 8900, 9000, 9100, 9300]));
+    assert.equal(selectAlerts(priced, { now: NOW }).length, 0);
   });
 });
 
