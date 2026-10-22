@@ -1,0 +1,143 @@
+/**
+ * GÉNÉRATEUR DE SCRIPTS & MESSAGES VENDEUR
+ *
+ * - Message de négociation : pointe les défauts détectés (rayure, calandre,
+ *   consommables...) pour obtenir une baisse de 500 € à 1 000 €.
+ * - Proposition de Mandat / Dépôt-Vente : pour les annonces en ligne depuis
+ *   15 jours ou plus (vente plus chère via le pro, zéro avance, gestion complète).
+ *
+ * Templates déterministes (gratuits, instantanés). La route /api/messages peut
+ * ensuite les affiner avec Claude si ANTHROPIC_API_KEY est configurée.
+ */
+
+import { MANDATE, NEGOTIATION_RANGE, SEASONALITY } from '../config/rules.js';
+import { clamp, roundTo } from './text.js';
+
+const eur = (n) => `${Math.round(n).toLocaleString('fr-FR')} €`;
+
+function vehicleName(listing) {
+  return [listing.brand, listing.model, listing.version].filter(Boolean).join(' ');
+}
+
+/**
+ * Remise demandée : somme des leviers, bornée à [500 € ; 1 000 €], arrondie à 50 €.
+ * @param {ReturnType<import('./scoring.js').scoreListing>} analysis
+ */
+export function negotiationDiscount(analysis) {
+  const { min, max, step } = NEGOTIATION_RANGE;
+  const base = analysis.finance.leversTotal > 0 ? analysis.finance.leversTotal : min;
+  // Annonce ancienne : on pousse la remise vers le haut de la fourchette.
+  const ageBoost = analysis.daysOnline >= MANDATE.minDaysOnline ? 200 : 0;
+  return clamp(roundTo(base + ageBoost, step), min, max);
+}
+
+/**
+ * @param {import('./scoring.js').Listing} listing
+ * @param {ReturnType<import('./scoring.js').scoreListing>} analysis
+ * @param {{ tone?: 'courtois'|'direct', signature?: string }} [options]
+ */
+export function generateNegotiationMessage(listing, analysis, options = {}) {
+  const tone = options.tone ?? 'direct';
+  const signature = options.signature ?? 'Cordialement';
+  const { max, step } = NEGOTIATION_RANGE;
+  // Offre arrondie au palier inférieur : la remise réelle reste >= la remise visée, sans dépasser le plafond.
+  let offer = Math.floor((listing.price - negotiationDiscount(analysis)) / step) * step;
+  if (listing.price - offer > max) offer = Math.ceil((listing.price - max) / step) * step;
+  // PureTech : le plafond -30 % de la cote prime sur la fourchette de négo.
+  if (analysis.puretechCondition) offer = Math.min(offer, Math.floor(analysis.puretechCondition.maxBuyPrice / step) * step);
+  const discount = listing.price - offer;
+  const name = vehicleName(listing);
+  const levers = analysis.levers;
+
+  const lines = [];
+  lines.push(tone === 'direct' ? 'Bonjour,' : 'Bonjour, j’espère que vous allez bien.');
+  lines.push('');
+  lines.push(
+    `Votre ${name} de ${listing.year} (${listing.mileage.toLocaleString('fr-FR')} km) m’intéresse et je peux conclure très vite : ` +
+      'paiement immédiat par virement instantané (fonds reçus en quelques secondes) et déplacement sous 48 h sur le secteur.',
+  );
+  lines.push('');
+
+  if (levers.length > 0) {
+    lines.push('En relisant l’annonce, je note quelques frais à prévoir de mon côté :');
+    for (const lever of levers) lines.push(`• ${lever.label} : ${lever.argument}.`);
+    lines.push('');
+  } else {
+    lines.push(
+      'Après comparaison avec les annonces équivalentes sur la région, le prix affiché se situe dans le haut de la fourchette du marché, ' +
+        'et je dois intégrer un passage en préparation (nettoyage complet, contrôle mécanique).',
+    );
+    lines.push('');
+  }
+
+  if (analysis.puretechCondition) {
+    lines.push(
+      'Le 1.2 PureTech impose aussi une vigilance particulière sur la courroie de distribution : pourriez-vous me transmettre la facture de remplacement courroie + crépine ?',
+    );
+    lines.push('');
+  }
+
+  if (listing.type === 'moto' && SEASONALITY.moto.buyMonths.includes(new Date().getMonth() + 1)) {
+    lines.push('En pleine période hivernale, la demande moto est au plus bas : je vous propose une solution immédiate plutôt que d’attendre le printemps.');
+    lines.push('');
+  }
+
+  if (analysis.daysOnline >= MANDATE.minDaysOnline) {
+    lines.push(`Votre annonce étant en ligne depuis ${analysis.daysOnline} jours, je vous propose une transaction simple et rapide.`);
+    lines.push('');
+  }
+
+  lines.push(
+    tone === 'direct'
+      ? `Mon offre ferme : ${eur(offer)}, payés immédiatement par virement instantané le jour de la vente. Je suis disponible dès cette semaine.`
+      : `Dans ces conditions, je peux vous proposer ${eur(offer)}, avec un paiement immédiat le jour de la vente. Seriez-vous ouvert à en discuter ?`,
+  );
+  lines.push('');
+  lines.push(signature);
+
+  return { subject: `${name} : offre ferme à ${eur(offer)}, virement instantané`, text: lines.join('\n'), offer, discount };
+}
+
+/**
+ * @param {import('./scoring.js').Listing} listing
+ * @param {ReturnType<import('./scoring.js').scoreListing>} analysis
+ * @param {{ signature?: string, company?: string }} [options]
+ */
+export function generateMandateMessage(listing, analysis, options = {}) {
+  const signature = options.signature ?? 'Cordialement';
+  const company = options.company ?? 'notre service de dépôt-vente';
+  const name = vehicleName(listing);
+  const mandate = analysis.mandate;
+  const salePrice = mandate?.salePrice ?? listing.marketPrice;
+  const ownerNet = mandate?.ownerNet ?? listing.price;
+
+  const netLine =
+    ownerNet >= listing.price
+      ? `• Vous fixez votre prix net : ${eur(ownerNet)}, soit le prix de votre annonce. C'est la somme que vous touchez, garantie par écrit.`
+      : `• Vous touchez un prix net garanti par écrit, autour de ${eur(ownerNet)}, fixé ensemble selon le marché actuel.`;
+
+  const lines = [
+    'Bonjour,',
+    '',
+    `Votre ${name} est en ligne depuis ${analysis.daysOnline} jours. Je vous propose de vous décharger complètement de la vente via ${company}, sans que vous ayez à avancer un centime.`,
+    '',
+    netLine,
+    `• Nous la vendons plus cher grâce au statut pro (prix visé autour de ${eur(salePrice)}) avec une garantie mécanique pour l'acheteur, ce qui fait accepter le juste prix.`,
+    '• Notre rémunération : uniquement la plus-value réalisée au-dessus de votre prix net. Si nous ne vendons pas au-dessus, nous ne gagnons rien.',
+    '• Zéro gestion des curieux : nous filtrons les appels, organisons les visites et les essais, et gérons toute la paperasse (cession, carte grise).',
+    "• Zéro avance d'argent : aucun frais à payer avant la vente.",
+    `• Mandat simple et clair : exclusivité de ${MANDATE.exclusivityDays} jours, vous restez propriétaire jusqu'à la vente.`,
+    '',
+    'Un appel de 5 minutes cette semaine pour en parler ?',
+    '',
+    signature,
+  ];
+
+  return {
+    subject: `Votre ${listing.brand} ${listing.model} : vendue plus cher, sans les curieux`,
+    text: lines.join('\n'),
+    salePrice,
+    ownerNet,
+    commission: mandate?.commission ?? Math.max(0, salePrice - ownerNet),
+  };
+}

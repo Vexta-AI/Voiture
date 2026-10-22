@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --surface: 255 255 255;
+  --ink-50: 247 248 250;
+  --ink-100: 238 240 244;
+  --ink-200: 221 225 232;
+  --ink-300: 194 200 211;
+  --ink-400: 141 150 167;
+  --ink-500: 100 110 130;
+  --ink-600: 74 83 103;
+  --ink-700: 54 61 78;
+  --ink-800: 31 36 51;
+  --ink-900: 18 22 33;
+}
+
+/* Mode sombre : la palette "ink" s'inverse, les composants n'ont rien à dupliquer. */
+.dark {
+  color-scheme: dark;
+  --surface: 17 21 29;
+  --ink-50: 10 13 19;
+  --ink-100: 26 31 41;
+  --ink-200: 39 46 59;
+  --ink-300: 58 66 82;
+  --ink-400: 110 119 137;
+  --ink-500: 143 151 168;
+  --ink-600: 172 180 194;
+  --ink-700: 202 208 218;
+  --ink-800: 226 230 236;
+  --ink-900: 244 246 249;
+}
+
+body {
+  @apply bg-ink-50 text-ink-900 antialiased transition-colors;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-ink-200 bg-surface shadow-card;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-900/20 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-ink-900 text-surface hover:bg-ink-800;
+  }
+  .btn-secondary {
+    @apply btn border border-ink-200 bg-surface text-ink-800 hover:bg-ink-50;
+  }
+  .btn-ghost {
+    @apply btn text-ink-600 hover:bg-ink-100 hover:text-ink-900;
+  }
+  .input {
+    @apply w-full rounded-lg border border-ink-200 bg-surface px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-ink-400 focus:outline-none focus:ring-2 focus:ring-ink-900/5;
+  }
+  .label {
+    @apply mb-1 block text-xs font-medium text-ink-500;
+  }
+}
