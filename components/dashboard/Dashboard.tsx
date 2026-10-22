@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { AUTO_TARGETS, BUDGETS, MANDATE, MOTO_TARGETS } from '@/backend/config/rules.js';
+import { AUTO_TARGETS, BUDGETS, MANDATE, MOTO_TARGETS, PRICE_BANDS, SEGMENTS } from '@/backend/config/rules.js';
 import { scoreListings } from '@/backend/utils/scoring.js';
 import { AnalyzerDrawer } from '@/components/analyzer/AnalyzerDrawer';
 import { ListingCard, type MessageKind } from '@/components/listing/ListingCard';
@@ -11,7 +11,7 @@ import { OutreachModal } from '@/components/messages/OutreachModal';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import type { Listing, ScoredListing, StatusKey, TabKey } from '@/lib/types';
 
-import { FilterBar, type SortKey, type StatusFilter } from './FilterBar';
+import { FilterBar, type Option, type SortKey, type StatusFilter, type ZoneFilter } from './FilterBar';
 import { KpiBar } from './KpiBar';
 import { MandateRules } from './MandateRules';
 import { TabNav } from './TabNav';
@@ -23,9 +23,9 @@ export type RadarInfo =
   | { mode: 'demo'; configured: boolean };
 
 const TABS: { key: TabKey; label: string; hint: string }[] = [
-  { key: 'auto', label: BUDGETS.auto.label, hint: 'Citadines / compactes (Clio 4/5, Polo, Golf, 208) & Tesla Shanghai' },
-  { key: 'moto', label: BUDGETS.moto.label, hint: 'Roadsters A2 & gros trails (BMW GS, MT-07, Z900)' },
-  { key: 'mandat', label: 'Dépôt-Vente / Mandat (J+15)', hint: 'Annonces en ligne depuis plus de 14 jours : sans-stock, zéro trésorerie' },
+  { key: 'auto', label: BUDGETS.auto.label, hint: 'Toutes les voitures de 3 à 30 k€ : Nouvelle-Aquitaine en priorité, puis France entière (rapatriement déduit).' },
+  { key: 'moto', label: BUDGETS.moto.label, hint: 'Roadsters, trails et maxi-scooters de 5 à 18 k€ : Nouvelle-Aquitaine en priorité, puis France entière.' },
+  { key: 'mandat', label: 'Dépôt-Vente / Mandat (J+15)', hint: 'Annonces de ta zone en ligne depuis plus de 14 jours : sans-stock, zéro trésorerie.' },
 ];
 
 const SORTERS: Record<SortKey, (a: ScoredListing, b: ScoredListing) => number> = {
@@ -33,16 +33,18 @@ const SORTERS: Record<SortKey, (a: ScoredListing, b: ScoredListing) => number> =
   margin: (a, b) => b.analysis.finance.netMargin - a.analysis.finance.netMargin,
   days: (a, b) => b.analysis.daysOnline - a.analysis.daysOnline,
   price: (a, b) => a.listing.price - b.listing.price,
+  distance: (a, b) => (a.analysis.distanceKm ?? 0) - (b.analysis.distanceKm ?? 0),
   mandate: (a, b) => (b.analysis.mandate?.totalRevenue ?? 0) - (a.analysis.mandate?.totalRevenue ?? 0),
 };
 
 export function Dashboard({ initialListings, radar }: { initialListings: Listing[]; radar: RadarInfo }) {
   const [tab, setTab] = useState<TabKey>('auto');
   const [userListings, setUserListings] = useState<Listing[]>([]);
-  const [targets, setTargets] = useState<Record<'auto' | 'moto', string[]>>({
-    auto: AUTO_TARGETS.map((t) => t.id),
-    moto: MOTO_TARGETS.map((t) => t.id),
-  });
+  // Aucun modèle sélectionné = tous les modèles.
+  const [targets, setTargets] = useState<Record<'auto' | 'moto', string[]>>({ auto: [], moto: [] });
+  const [zone, setZone] = useState<ZoneFilter>('all');
+  const [gamme, setGamme] = useState('all');
+  const [band, setBand] = useState('all');
   const [status, setStatus] = useState<StatusFilter>('ALL');
   const [sort, setSort] = useState<SortKey>('score');
   const [query, setQuery] = useState('');
@@ -77,27 +79,72 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
   const scored = useMemo(() => scoreListings([...userListings, ...initialListings]) as ScoredListing[], [userListings, initialListings]);
   const userIds = useMemo(() => new Set(userListings.map((l) => l.id)), [userListings]);
 
-  /** Périmètre de l'onglet (avant filtres statut / recherche). */
+  /** Périmètre de l'onglet (type, budget global, mandat). */
   const scope = useMemo(() => {
     if (tab === 'mandat') return scored.filter((s) => s.analysis.mandateEligible);
     const budget = BUDGETS[tab];
-    const selected = targets[tab];
-    return scored.filter(
+    return scored.filter((s) => s.listing.type === tab && s.listing.price >= budget.min && s.listing.price <= budget.max);
+  }, [scored, tab]);
+
+  /** Gamme d'une annonce : segment pour l'auto, famille (roadster, trail…) pour la moto. */
+  const gammeOf = useCallback(
+    (s: ScoredListing) => {
+      if (s.listing.type !== 'moto') return s.analysis.segment;
+      const target = MOTO_TARGETS.find((t) => s.analysis.targets.includes(t.id));
+      return target?.family ?? 'Autre';
+    },
+    [],
+  );
+  // Annonces de démo / saisies à la main : sans GPS, considérées dans la zone prioritaire.
+  const zoneOf = (s: ScoredListing) => s.analysis.zone ?? 'prioritaire';
+
+  const countBy = (items: ScoredListing[], key: (s: ScoredListing) => string | null) => {
+    const counts = new Map<string, number>();
+    for (const s of items) {
+      const k = key(s);
+      if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    return counts;
+  };
+
+  /** Filtres zone / gamme / budget / modèles (avant statut et recherche). */
+  const filtered = useMemo(() => {
+    const selected = tab === 'mandat' ? [] : targets[tab];
+    return scope.filter(
       (s) =>
-        s.listing.type === tab &&
-        s.listing.price >= budget.min &&
-        s.listing.price <= budget.max &&
-        (userIds.has(s.listing.id) || s.analysis.targets.some((t: string) => selected.includes(t))),
+        (zone === 'all' || zoneOf(s) === zone) &&
+        (gamme === 'all' || gammeOf(s) === gamme) &&
+        (band === 'all' || s.analysis.priceBand === band) &&
+        (selected.length === 0 || userIds.has(s.listing.id) || s.analysis.targets.some((t: string) => selected.includes(t))),
     );
-  }, [scored, tab, targets, userIds]);
+  }, [scope, zone, gamme, band, targets, tab, userIds, gammeOf]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return scope
+    return filtered
       .filter((s) => status === 'ALL' || s.analysis.status.key === status)
       .filter((s) => !q || `${s.listing.title} ${s.listing.location ?? ''}`.toLowerCase().includes(q))
       .sort(SORTERS[tab === 'mandat' && sort === 'score' ? 'mandate' : sort]);
-  }, [scope, status, query, sort, tab]);
+  }, [filtered, status, query, sort, tab]);
+
+  const filterOptions = useMemo(() => {
+    const zoneCounts = countBy(scope, zoneOf);
+    const zones: Option[] = [
+      { id: 'all', label: 'Toutes', count: scope.length },
+      { id: 'prioritaire', label: 'Nouvelle-Aquitaine (200 km)', count: zoneCounts.get('prioritaire') ?? 0 },
+      { id: 'france', label: 'France entière', count: zoneCounts.get('france') ?? 0 },
+    ];
+    const gammeCounts = countBy(scope, gammeOf);
+    const gammeIds = tab === 'moto' ? [...gammeCounts.keys()].sort() : Object.keys(SEGMENTS).filter((k) => k !== 'moto');
+    const gammes: Option[] = [
+      { id: 'all', label: 'Toutes', count: scope.length },
+      ...gammeIds.map((id) => ({ id, label: SEGMENTS[id as keyof typeof SEGMENTS]?.label ?? id, count: gammeCounts.get(id) ?? 0 })),
+    ];
+    const bandCounts = countBy(scope, (s) => s.analysis.priceBand);
+    const bandList = tab === 'moto' ? PRICE_BANDS.moto : tab === 'auto' ? PRICE_BANDS.auto : [...PRICE_BANDS.auto, ...PRICE_BANDS.moto];
+    const bands: Option[] = [{ id: 'all', label: 'Tous', count: scope.length }, ...bandList.map((b) => ({ id: b.id, label: b.label, count: bandCounts.get(b.id) ?? 0 }))];
+    return { zones, gammes, bands };
+  }, [scope, tab, gammeOf]);
 
   const counts = useMemo(
     () => ({
@@ -110,9 +157,9 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
 
   const statusCounts = useMemo(() => {
     const c: Record<StatusKey, number> = { PEPITE: 0, SURVEILLER: 0, REFUSE: 0 };
-    for (const s of scope) c[s.analysis.status.key] += 1;
+    for (const s of filtered) c[s.analysis.status.key] += 1;
     return c;
-  }, [scope]);
+  }, [filtered]);
 
   const activeTab = TABS.find((t) => t.key === tab)!;
 
@@ -126,7 +173,7 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
             </div>
             <div>
               <h1 className="text-base font-semibold leading-tight text-ink-900">Pépite Radar</h1>
-              <p className="hidden text-xs text-ink-500 sm:block">Veille · scoring · décision — Achat-revente & mandat Auto/Moto · Bordeaux & région</p>
+              <p className="hidden text-xs text-ink-500 sm:block">Veille · scoring · décision — Achat-revente & mandat Auto/Moto · Nouvelle-Aquitaine puis France</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -137,7 +184,17 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
           </div>
         </div>
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <TabNav tabs={TABS} active={tab} counts={counts} onChange={(t) => { setTab(t); setStatus('ALL'); }} />
+          <TabNav
+            tabs={TABS}
+            active={tab}
+            counts={counts}
+            onChange={(t) => {
+              setTab(t);
+              setStatus('ALL');
+              setGamme('all');
+              setBand('all');
+            }}
+          />
         </div>
       </header>
 
@@ -145,12 +202,21 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
         <RadarBanner radar={radar} />
         <p className="text-sm text-ink-500">{activeTab.hint}</p>
 
-        <KpiBar tab={tab} items={scope} />
+        <KpiBar tab={tab} items={filtered} />
 
         {tab === 'mandat' && <MandateRules />}
 
         <FilterBar
           tab={tab}
+          zones={filterOptions.zones}
+          zone={zone}
+          onZone={setZone}
+          gammes={filterOptions.gammes}
+          gamme={gamme}
+          onGamme={setGamme}
+          bands={filterOptions.bands}
+          band={band}
+          onBand={setBand}
           targets={tab === 'mandat' ? [] : tab === 'auto' ? AUTO_TARGETS : MOTO_TARGETS}
           selectedTargets={tab === 'mandat' ? [] : targets[tab]}
           onToggleTarget={(id) => {
@@ -160,6 +226,7 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
               [tab]: prev[tab].includes(id) ? prev[tab].filter((x) => x !== id) : [...prev[tab], id],
             }));
           }}
+          onClearTargets={() => tab !== 'mandat' && setTargets((prev) => ({ ...prev, [tab]: [] }))}
           status={status}
           statusCounts={statusCounts}
           onStatus={setStatus}

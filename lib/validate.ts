@@ -58,7 +58,7 @@ export function validateListing(input: unknown): Result {
       vin: str(o.vin),
       licenseCategory: license === 'MTT1' || license === 'MTT2' ? license : undefined,
       beltMonthsAgo: num(o.beltMonthsAgo),
-      segment: segment === 'citadine' || segment === 'compacte' || segment === 'premium' || segment === 'moto' ? segment : undefined,
+      segment: segment === 'citadine' || segment === 'compacte' || segment === 'suv' || segment === 'premium' || segment === 'moto' ? segment : undefined,
       publishedAt: published,
       location: str(o.location),
       source: str(o.source),

@@ -28,6 +28,12 @@ export function MarginBreakdown({ analysis }: { analysis: Analysis }) {
         <div className="mt-1 border-t border-ink-100 pt-1">
           <Row label="Marge nette estimée" value={signedEur(f.netMargin)} strong />
         </div>
+        {f.transportCost > 0 && (
+          <>
+            <Row label="Rapatriement" value={`− ${eur(f.transportCost)}`} muted hint={`${analysis.distanceKm} km : billet + route`} />
+            <Row label="Marge nette après rapatriement" value={signedEur(f.netMarginAfterTransport)} strong />
+          </>
+        )}
         {f.triggersBonus > 0 && (
           <Row label="Potentiel options (hors statut)" value={signedEur(f.triggersBonus)} muted hint="argument de revente" />
         )}
@@ -37,6 +43,7 @@ export function MarginBreakdown({ analysis }: { analysis: Analysis }) {
         <Row label="Leviers de négo" value={f.leversTotal ? `− ${eur(f.leversTotal)}` : '—'} muted />
         <Row label="Prix d'achat cible" value={eur(f.targetPrice)} />
         <Row label="Coût réel des défauts" value={f.leversRealCost ? `− ${eur(f.leversRealCost)}` : '—'} muted />
+        {f.transportCost > 0 && <Row label="Rapatriement" value={`− ${eur(f.transportCost)}`} muted />}
         <div className="mt-1 border-t border-ink-100 pt-1">
           <Row label="Marge nette négociée" value={signedEur(f.negotiatedNetMargin)} strong />
         </div>

@@ -166,7 +166,8 @@ export async function ingestRun(runId: string, sourceKey: string) {
 
   // Le scraper n'applique pas toujours le rayon : seules les annonces vérifiées dans la zone sont chassées
   // (toutes restent dans le stock de comparables).
-  const { kept, stats } = filterArea(listings, config.area ?? DEFAULT_AREA);
+  // Mandat (stale) : zone prioritaire uniquement ; achat-revente : France entière, zone prioritaire d'abord.
+  const { kept, stats } = filterArea(listings, config.area ?? DEFAULT_AREA, { national: source.kind !== 'stale' });
   Object.assign(summary, { area: stats });
   const pool = dedupeById((await loadRuns(HUNT_LIMITS.retentionDays)).flatMap((r) => r.listings));
   const { priced, unpriced } = priceListings(kept, pool);

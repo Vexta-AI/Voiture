@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import { SAMPLE_LISTINGS } from '../data/listings.js';
 import { generateMandateMessage, generateNegotiationMessage, negotiationDiscount } from './messages.js';
 import { buildOutreachPayload, eligibleStrategies } from './outreach.js';
-import { classifySegment, scoreListing } from './scoring.js';
+import { classifySegment, priceBand, scoreListing } from './scoring.js';
 
 const NOW = new Date('2026-10-22T12:00:00Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -162,6 +162,22 @@ describe('Options déclencheurs', () => {
 });
 
 describe('Segments & Mandat', () => {
+  it('classe les SUV à part (C3 Aircross n’est pas une C3)', () => {
+    assert.equal(classifySegment(base({ brand: 'Peugeot', model: '2008' })), 'suv');
+    assert.equal(classifySegment(base({ brand: 'Renault', model: 'Captur' })), 'suv');
+    assert.equal(classifySegment(base({ brand: 'Citroen', model: 'C3 Aircross' })), 'suv');
+    assert.equal(classifySegment(base({ brand: 'Citroen', model: 'C3' })), 'citadine');
+    assert.equal(classifySegment(base({ brand: 'Peugeot', model: '208' })), 'citadine');
+  });
+
+  it('range chaque annonce dans sa tranche de budget', () => {
+    assert.equal(priceBand(base({ price: 4500 })), 'a1');
+    assert.equal(priceBand(base({ price: 6000 })), 'a2');
+    assert.equal(priceBand(base({ price: 30000 })), 'a4');
+    assert.equal(priceBand(base({ price: 2500 })), null);
+    assert.equal(priceBand(base({ type: 'moto', price: 9000 })), 'm2');
+  });
+
   it('classe les segments', () => {
     assert.equal(classifySegment(base()), 'citadine');
     assert.equal(classifySegment(base({ brand: 'Volkswagen', model: 'Golf 7', version: 'GTI' })), 'premium');

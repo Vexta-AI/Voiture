@@ -21,11 +21,13 @@ import {
   BUDGETS,
   COSTS,
   DOORS_RULE,
+  LOGISTICS,
   MANDATE,
   MAX_TRIGGER_BONUS,
   MOTO_A2,
   MOTO_TARGETS,
   NEGOTIATION_LEVERS,
+  PRICE_BANDS,
   SEASONALITY,
   SEGMENTS,
   SEGMENT_RULES,
@@ -55,7 +57,9 @@ import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplaceme
  * @property {string} [vin]
  * @property {'MTT1'|'MTT2'} [licenseCategory]  moto : carte grise A2 (MTT1) ou Full (MTT2)
  * @property {number} [beltMonthsAgo] PureTech : ancienneté (mois) de la facture courroie + crépine
- * @property {'citadine'|'compacte'|'premium'|'moto'} [segment] force le segment
+ * @property {'citadine'|'compacte'|'suv'|'premium'|'moto'} [segment] force le segment
+ * @property {'prioritaire'|'france'} [zone] zone fixée à l'ingestion
+ * @property {number} [distanceKm]    distance à la base (annonces réelles) : rapatriement au-delà de la zone prioritaire
  * @property {string} publishedAt     ISO date de mise en ligne
  * @property {string} [location]
  * @property {string} [source]
@@ -113,6 +117,25 @@ export function classifySegment(listing) {
     if (rule.versionPatterns?.some((p) => withVersion.includes(p))) return rule.segment;
   }
   return 'compacte';
+}
+
+/** Tranche de budget de l'annonce (id de PRICE_BANDS) ou null si hors tranches. */
+export function priceBand(listing) {
+  const bands = PRICE_BANDS[listing.type] ?? [];
+  return bands.find((b) => listing.price >= b.min && listing.price < b.max)?.id ?? bands.find((b) => listing.price === b.max)?.id ?? null;
+}
+
+/**
+ * Zone et coût de rapatriement : 0 dans la zone prioritaire, billet + route au-delà.
+ * @returns {{ zone: 'prioritaire'|'france'|null, distanceKm: number|null, transportCost: number }}
+ */
+export function logistics(listing) {
+  if (typeof listing.distanceKm !== 'number') return { zone: null, distanceKm: null, transportCost: 0 };
+  const d = Math.round(listing.distanceKm);
+  // La zone fixée à l'ingestion (rayon HUNT_AREA) prime sur le rayon par défaut.
+  const priority = listing.zone ? listing.zone === 'prioritaire' : d <= LOGISTICS.priorityRadiusKm;
+  if (priority) return { zone: 'prioritaire', distanceKm: d, transportCost: 0 };
+  return { zone: 'france', distanceKm: d, transportCost: Math.round((LOGISTICS.ticketCost + d * LOGISTICS.perKm) / 10) * 10 };
 }
 
 /** Cibles de chasse (onglets) auxquelles correspond l'annonce. */
@@ -355,14 +378,17 @@ export function scoreListing(listing, options = {}) {
   /** Valeur perçue avec options déclencheurs (argument de revente, hors statut). */
   const resaleValue = marketPrice + triggersBonus;
   const netMarginWithOptions = netMargin + triggersBonus;
+  // Achat à distance : le rapatriement est déduit avant de parler de pépite.
+  const geo = logistics(listing);
+  const netMarginAfterTransport = netMargin - geo.transportCost;
 
   // --- Scénario négocié (leviers + coût réel des défauts) ---
   const leversTotal = levers.reduce((sum, l) => sum + l.discount, 0);
   const leversRealCost = levers.reduce((sum, l) => sum + l.realCost, 0);
   const targetPrice = Math.max(0, askingPrice - leversTotal);
-  const negotiatedNetMargin = marketPrice - targetPrice - fixedCosts - leversRealCost;
+  const negotiatedNetMargin = marketPrice - targetPrice - fixedCosts - leversRealCost - geo.transportCost;
   /** Prix d'achat maximum pour atteindre le seuil PÉPITE (marge nette strictement supérieure au seuil). */
-  const maxBuyPriceForPepite = marketPrice - fixedCosts - threshold - 1;
+  const maxBuyPriceForPepite = marketPrice - fixedCosts - threshold - 1 - geo.transportCost;
 
   // --- Contexte marché ---
   const inBudget = askingPrice >= budget.min && askingPrice <= budget.max;
@@ -388,7 +414,10 @@ export function scoreListing(listing, options = {}) {
     insights.push("Comparer avec l'Italie / la Belgique : écart de prix exploitable à l'import.");
   }
 
-  if (online >= MANDATE.minDaysOnline) {
+  if (geo.zone === 'france') {
+    warnings.push(`Achat à distance (${geo.distanceKm} km) : rapatriement ≈ ${geo.transportCost.toLocaleString('fr-FR')} € déduit de la marge. Mandat impossible.`);
+  }
+  if (online >= MANDATE.minDaysOnline && geo.zone !== 'france') {
     insights.push(`En ligne depuis ${online} jours : vendeur fatigué par les curieux, levier de négo et cible Mandat.`);
   }
 
@@ -398,26 +427,28 @@ export function scoreListing(listing, options = {}) {
   /** @type {typeof STATUS[keyof typeof STATUS]} */
   let status;
   if (isBlacklisted) status = STATUS.REFUSE;
-  else if (netMargin > threshold && !puretechOverpriced) status = STATUS.PEPITE;
-  else if (netMargin > 0 || negotiatedNetMargin > 0) status = STATUS.SURVEILLER;
+  else if (netMarginAfterTransport > threshold && !puretechOverpriced) status = STATUS.PEPITE;
+  else if (netMarginAfterTransport > 0 || negotiatedNetMargin > 0) status = STATUS.SURVEILLER;
   else status = STATUS.REFUSE;
 
   // --- Score 0-100 ---
   let score = 0;
   if (!isBlacklisted) {
-    const marginPts = clamp((netMargin / threshold) * 50, 0, 70);
+    const marginPts = clamp((netMarginAfterTransport / threshold) * 50, 0, 70);
     const triggerPts = clamp(triggersBonus / 100, 0, 10);
     const leverPts = clamp(leversTotal / 100, 0, 10);
     const agePts = online >= MANDATE.minDaysOnline ? 5 : 0;
     const liquidityPts = listing.type === 'auto' && segment === 'citadine' && (listing.doors ?? 5) >= 5 ? 5 : listing.type === 'moto' && triggers.some((t) => t.id === MOTO_A2.id) ? 5 : 0;
-    let penalties = warnings.length * 5;
+    // Le rapatriement est déjà déduit de la marge : son avertissement ne pénalise pas deux fois.
+    let penalties = (warnings.length - (geo.zone === 'france' ? 1 : 0)) * 5;
     if (puretechOverpriced) penalties += 15;
     if (!inBudget) penalties += 10;
     score = Math.round(clamp(marginPts + triggerPts + leverPts + agePts + liquidityPts - penalties, 0, 100));
     if (status.key === 'REFUSE') score = Math.min(score, 20);
   }
 
-  const mandateEligible = online >= MANDATE.minDaysOnline && !isBlacklisted;
+  // Le dépôt-vente suppose de récupérer le véhicule : zone prioritaire uniquement.
+  const mandateEligible = online >= MANDATE.minDaysOnline && !isBlacklisted && geo.zone !== 'france';
 
   return {
     listingId: listing.id,
@@ -425,6 +456,9 @@ export function scoreListing(listing, options = {}) {
     score,
     segment,
     segmentLabel: segmentRule.label,
+    priceBand: priceBand(listing),
+    zone: geo.zone,
+    distanceKm: geo.distanceKm,
     threshold,
     targets: matchTargets(listing),
     daysOnline: online,
@@ -442,6 +476,8 @@ export function scoreListing(listing, options = {}) {
       resaleValue,
       grossMargin,
       netMarginWithOptions,
+      transportCost: geo.transportCost,
+      netMarginAfterTransport,
       reconditioning: COSTS.RECONDITIONING_BASE,
       riskCapital: COSTS.RISK_CAPITAL,
       netMargin,

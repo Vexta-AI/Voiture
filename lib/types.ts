@@ -1,7 +1,7 @@
 import type { scoreListing } from '@/backend/utils/scoring.js';
 
 export type VehicleType = 'auto' | 'moto';
-export type SegmentKey = 'citadine' | 'compacte' | 'premium' | 'moto';
+export type SegmentKey = 'citadine' | 'compacte' | 'suv' | 'premium' | 'moto';
 
 export interface Listing {
   id: string;
@@ -32,6 +32,9 @@ export interface Listing {
   lat?: number;
   lng?: number;
   zip?: string;
+  /** Distance à la base (km), calculée à l'ingestion */
+  distanceKm?: number;
+  zone?: 'prioritaire' | 'france';
 }
 
 export type Analysis = ReturnType<typeof scoreListing>;
