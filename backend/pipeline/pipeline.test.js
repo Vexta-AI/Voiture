@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { DEFAULT_AREA, defaultSources, parseArea } from '../config/sources.js';
-import { getDatasetItems, startRun } from './apify.js';
+import { getDatasetItems, isCapacityError, startRun } from './apify.js';
 import { alertKey, priceListings, selectAlerts } from './hunt.js';
 import { estimateMarketPrice, modelKey } from './market.js';
 import { normalizeApifyItem, toInt } from './normalize.js';
@@ -177,6 +177,26 @@ describe('Apify & sources', () => {
     assert.equal(JSON.parse(hook2.headersTemplate)['x-vercel-protection-bypass'], 'byp');
     const input = JSON.parse(call.init.body);
     assert.deepEqual(input.proxyConfiguration, { useApifyProxy: true, apifyProxyGroups: ['RESIDENTIAL'], apifyProxyCountry: 'FR' });
+  });
+
+  it('transmet le lot dans le webhook et reconnaît les refus de capacité', async () => {
+    let call;
+    const ok = async (url) => {
+      call = new URL(url);
+      return new Response(JSON.stringify({ data: { id: 'r1', status: 'READY' } }), { status: 201 });
+    };
+    const [source] = defaultSources();
+    await startRun({ token: 't', source, webhookUrl: 'https://app.test/api/hunt/ingest', webhookSecret: 's', maxChargeUsd: 1, batchId: '2026-10-22-w-abc12345', fetchImpl: ok });
+    const [hook] = JSON.parse(Buffer.from(call.searchParams.get('webhooks'), 'base64').toString());
+    const cb = new URL(hook.requestUrl);
+    assert.equal(cb.searchParams.get('source'), source.key);
+    assert.equal(cb.searchParams.get('batch'), '2026-10-22-w-abc12345');
+
+    const full = async () => new Response('{"error":{"type":"concurrent-runs-limit-exceeded"}}', { status: 402 });
+    const error = await startRun({ token: 't', source, webhookUrl: 'x', webhookSecret: 's', maxChargeUsd: 1, fetchImpl: full }).catch((e) => e);
+    assert.equal(isCapacityError(error), true);
+    const bad = await startRun({ token: 't', source, webhookUrl: 'x', webhookSecret: 's', maxChargeUsd: 1, fetchImpl: async () => new Response('bad', { status: 400 }) }).catch((e) => e);
+    assert.equal(isCapacityError(bad), false);
   });
 
   it('remonte les erreurs Apify', async () => {

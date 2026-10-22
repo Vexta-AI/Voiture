@@ -15,21 +15,31 @@ async function apify(path, { token, method = 'GET', body, fetchImpl = fetch }) {
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(20_000),
   });
-  if (!res.ok) throw new Error(`Apify ${method} ${path.split('?')[0]} -> ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) {
+    // status : distingue les refus de capacité (402/429) des vraies erreurs
+    throw Object.assign(new Error(`Apify ${method} ${path.split('?')[0]} -> ${res.status}: ${(await res.text()).slice(0, 200)}`), { status: res.status });
+  }
   return res.json();
+}
+
+/** Refus temporaire de capacité (limite de runs simultanés, quota) : la recherche sera retentée. */
+export function isCapacityError(error) {
+  return error instanceof Error && 'status' in error && (error.status === 402 || error.status === 429);
 }
 
 /**
  * Lance un run asynchrone avec webhook de retour (succès ou échec).
  * bypassSecret : jeton "Protection Bypass for Automation" de Vercel, pour traverser la
  * protection du déploiement (le dashboard reste privé, seul le webhook passe).
- * @param {{ token: string, source: import('../config/sources.js').HuntSource, webhookUrl: string, webhookSecret: string, maxChargeUsd: number, bypassSecret?: string, fetchImpl?: typeof fetch }} params
+ * batchId : lot de recherches auquel appartient le run (le webhook lance la suivante du lot).
+ * @param {{ token: string, source: import('../config/sources.js').HuntSource, webhookUrl: string, webhookSecret: string, maxChargeUsd: number, bypassSecret?: string, batchId?: string, fetchImpl?: typeof fetch }} params
  */
-export async function startRun({ token, source, webhookUrl, webhookSecret, maxChargeUsd, bypassSecret, fetchImpl }) {
+export async function startRun({ token, source, webhookUrl, webhookSecret, maxChargeUsd, bypassSecret, batchId, fetchImpl }) {
+  const callback = new URLSearchParams({ source: source.key, ...(batchId ? { batch: batchId } : {}) });
   const webhooks = [
     {
       eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED', 'ACTOR.RUN.TIMED_OUT', 'ACTOR.RUN.ABORTED'],
-      requestUrl: `${webhookUrl}?source=${encodeURIComponent(source.key)}`,
+      requestUrl: `${webhookUrl}?${callback}`,
       headersTemplate: JSON.stringify({
         'x-ingest-secret': webhookSecret,
         ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),

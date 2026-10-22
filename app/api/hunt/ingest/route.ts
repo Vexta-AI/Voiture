@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { secretMatches } from '@/lib/auth';
-import { huntConfig, ingestRun, missingConfig } from '@/lib/hunt';
+import { continueBatch, huntConfig, ingestRun, missingConfig } from '@/lib/hunt';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,9 @@ export async function POST(request: Request) {
   const missing = missingConfig(config, ['apify', 'store']);
   if (missing.length) return NextResponse.json({ ok: false, error: 'missing_config', missing }, { status: 503 });
 
-  const source = new URL(request.url).searchParams.get('source') ?? '';
+  const params = new URL(request.url).searchParams;
+  const source = params.get('source') ?? '';
+  const batch = params.get('batch');
   let runId: unknown;
   try {
     const body = await request.json();
@@ -31,12 +33,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'missing_run_id' }, { status: 400 });
   }
 
+  let summary: Awaited<ReturnType<typeof ingestRun>> | { ok: false; error: string };
   try {
-    const summary = await ingestRun(runId, source);
-    // 200 même pour un run en échec : rien à rejouer côté Apify, le résumé suffit au diagnostic.
-    return NextResponse.json(summary);
+    summary = await ingestRun(runId, source);
   } catch (error) {
     console.error('[api/hunt/ingest]', error);
-    return NextResponse.json({ ok: false, error: 'ingest_failed' }, { status: 500 });
+    summary = { ok: false, error: 'ingest_failed' };
   }
+  // Le run est terminé (succès ou échec) : un créneau Apify se libère, on lance la recherche suivante du lot.
+  const next = batch ? await continueBatch(batch).catch((error) => (console.error('[api/hunt/ingest] next', error), [])) : [];
+  // 200 même pour un run en échec : rien à rejouer côté Apify, le résumé suffit au diagnostic.
+  return NextResponse.json({ ...summary, next }, { status: summary.ok === false && summary.error === 'ingest_failed' ? 500 : 200 });
 }
