@@ -82,6 +82,8 @@ export function normalizeApifyItem(item, context) {
   const city = item.location_city ?? item.city;
   const zip = item.location_zipcode ?? item.zipcode;
   const doors = toInt(attr(item, 'doors', 'nb_doors'));
+  // Puissance fiscale (carte grise) : "horsepower" chez LeBonCoin, à ne pas confondre avec "horse_power_din".
+  const fiscalHp = toInt(attr(item, 'horsepower', 'fiscal_horsepower', 'puissance_fiscale'));
   const description = String(item.description ?? item.body ?? '');
   // Carte grise MTT1/MTT2 uniquement si le scraper la fournit ; sinon les mots-clés A2 du texte font foi.
   const license = String(attr(item, 'licence', 'license', 'license_category') ?? '').toUpperCase();
@@ -104,6 +106,7 @@ export function normalizeApifyItem(item, context) {
       marketPrice: 0,
       description,
       doors: doors && doors >= 2 && doors <= 5 ? doors : undefined,
+      fiscalHp: fiscalHp && fiscalHp >= 1 && fiscalHp <= 60 ? fiscalHp : undefined,
       licenseCategory: context.type === 'moto' && (license === 'MTT1' || license === 'MTT2') ? license : undefined,
       publishedAt: item.published_date ?? item.first_publication_date ?? item.index_date ?? new Date().toISOString(),
       location: city ? `${city}${zip ? ` (${String(zip).slice(0, 2)})` : ''}` : undefined,

@@ -20,6 +20,8 @@ export interface Listing {
   description?: string;
   options?: string[];
   doors?: number;
+  /** Puissance fiscale (CV) : base de la carte grise */
+  fiscalHp?: number;
   vin?: string;
   licenseCategory?: 'MTT1' | 'MTT2';
   beltMonthsAgo?: number;

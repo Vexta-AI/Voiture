@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { AUTO_TARGETS, BUDGETS, MANDATE, MOTO_TARGETS, PRICE_BANDS, SEGMENTS } from '@/backend/config/rules.js';
@@ -30,7 +31,7 @@ const TABS: { key: TabKey; label: string; hint: string }[] = [
 
 const SORTERS: Record<SortKey, (a: ScoredListing, b: ScoredListing) => number> = {
   score: (a, b) => b.analysis.score - a.analysis.score,
-  margin: (a, b) => b.analysis.finance.netMargin - a.analysis.finance.netMargin,
+  margin: (a, b) => b.analysis.finance.realNetMargin - a.analysis.finance.realNetMargin,
   days: (a, b) => b.analysis.daysOnline - a.analysis.daysOnline,
   price: (a, b) => a.listing.price - b.listing.price,
   distance: (a, b) => (a.analysis.distanceKm ?? 0) - (b.analysis.distanceKm ?? 0),
@@ -52,6 +53,8 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
   const [outreach, setOutreach] = useState<ScoredListing | null>(null);
   const [analyzerOpen, setAnalyzerOpen] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(false);
+  /** Annonces déjà suivies dans le CRM (null = CRM non branché). */
+  const [crmIds, setCrmIds] = useState<Set<string> | null>(null);
 
   // Annonces saisies manuellement : simple confort local, le moteur reste la source de vérité.
   useEffect(() => {
@@ -61,6 +64,10 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
     } catch {
       /* stockage indisponible : on continue sans */
     }
+    fetch('/api/crm')
+      .then((r) => r.json())
+      .then((d) => setCrmIds(d.ok ? new Set((d.deals as { kind: string; vehicle: { listingId: string } }[]).map((x) => `${x.kind}:${x.vehicle.listingId}`)) : null))
+      .catch(() => setCrmIds(null));
     fetch('/api/messages')
       .then((r) => r.json())
       .then((d) => setAiEnabled(Boolean(d.aiEnabled)))
@@ -74,6 +81,12 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
     } catch {
       /* ignore */
     }
+  }, []);
+
+  const addToCrm = useCallback(async (item: ScoredListing, kind: 'achat' | 'mandat') => {
+    const res = await fetch('/api/crm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, listing: item.listing }) });
+    const json = await res.json().catch(() => ({ ok: false }));
+    if (json.ok) setCrmIds((prev) => new Set([...(prev ?? []), `${kind}:${item.listing.id}`]));
   }, []);
 
   const scored = useMemo(() => scoreListings([...userListings, ...initialListings]) as ScoredListing[], [userListings, initialListings]);
@@ -178,6 +191,9 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
           </div>
           <div className="flex items-center gap-1.5">
             <ThemeToggle />
+            <Link href="/crm" className="btn-secondary">
+              CRM
+            </Link>
             <button type="button" className="btn-primary" onClick={() => setAnalyzerOpen(true)}>
               + Analyser<span className="hidden sm:inline"> une annonce</span>
             </button>
@@ -255,13 +271,14 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
                 onMessage={(it, kind) => setMessage({ item: it, kind })}
                 onOutreach={setOutreach}
                 onRemove={userIds.has(item.listing.id) ? (id) => persist(userListings.filter((l) => l.id !== id)) : undefined}
+                crm={crmIds ? { inCrm: crmIds.has(`${tab === 'mandat' ? 'mandat' : 'achat'}:${item.listing.id}`), onAdd: addToCrm } : undefined}
               />
             ))}
           </div>
         )}
 
         <footer className="pt-4 text-center text-xs text-ink-400">
-          Marge nette = Cote pro − Prix affiché − 350 € remise en état − 200 € capital risque. Règle d’or : viser la moyenne du
+          Marge réelle = Cote pro − Prix affiché − 350 € remise en état − 200 € capital risque − carte grise − rapatriement (hors zone). Règle d’or : viser la moyenne du
           marché, jamais le prix le plus haut.
         </footer>
       </main>

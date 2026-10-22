@@ -134,6 +134,59 @@ export const LOGISTICS = {
   metroBounds: { latMin: 41.2, latMax: 51.2, lngMin: -5.3, lngMax: 9.7 },
 };
 
+/**
+ * Arbitrage campagne -> ville : loin des grandes villes, la demande est faible et les prix plus bas.
+ * On achète à la campagne, on revend à Bordeaux (cote = médiane de tout le marché).
+ * Une annonce à plus de minKm de toutes ces villes est « campagne ».
+ */
+export const RURAL = {
+  minKm: 30,
+  scoreBonus: 5,
+  cities: [
+    { name: 'Bordeaux', lat: 44.8378, lng: -0.5792 },
+    { name: 'Paris', lat: 48.8566, lng: 2.3522 },
+    { name: 'Lyon', lat: 45.764, lng: 4.8357 },
+    { name: 'Marseille', lat: 43.2965, lng: 5.3698 },
+    { name: 'Toulouse', lat: 43.6047, lng: 1.4442 },
+    { name: 'Nice', lat: 43.7102, lng: 7.262 },
+    { name: 'Nantes', lat: 47.2184, lng: -1.5536 },
+    { name: 'Montpellier', lat: 43.6108, lng: 3.8767 },
+    { name: 'Strasbourg', lat: 48.5734, lng: 7.7521 },
+    { name: 'Lille', lat: 50.6292, lng: 3.0573 },
+    { name: 'Rennes', lat: 48.1173, lng: -1.6778 },
+    { name: 'Limoges', lat: 45.8336, lng: 1.2611 },
+    { name: 'Poitiers', lat: 46.5802, lng: 0.3404 },
+    { name: 'Pau', lat: 43.2951, lng: -0.3708 },
+    { name: 'La Rochelle', lat: 46.1603, lng: -1.1511 },
+    { name: 'Bayonne', lat: 43.4929, lng: -1.4748 },
+    { name: 'Angoulême', lat: 45.6484, lng: 0.1562 },
+    { name: 'Périgueux', lat: 45.1846, lng: 0.7214 },
+    { name: 'Agen', lat: 44.2033, lng: 0.6163 },
+    { name: 'Niort', lat: 46.3237, lng: -0.4588 },
+    { name: 'Mont-de-Marsan', lat: 43.8902, lng: -0.4994 },
+  ],
+};
+
+/**
+ * Carte grise à l'achat (Nouvelle-Aquitaine, tarif au 1er mars 2026).
+ * status "particulier" : immatriculation à ton nom obligatoire sous un mois, à chaque achat.
+ * status "pro" (micro-entreprise + W garage) : simple déclaration d'achat, 0 € -> passer à 'pro' le jour J.
+ * Le malus ne concerne que la 1re immatriculation en France (import) : jamais une occasion française.
+ */
+export const REGISTRATION = {
+  status: /** @type {'particulier'|'pro'} */ ('particulier'),
+  region: 'Nouvelle-Aquitaine',
+  /** Taxe régionale par cheval fiscal. */
+  pricePerCv: 58,
+  /** Au-delà de 10 ans, la taxe régionale est divisée par deux. */
+  oldVehicleYears: 10,
+  oldVehicleDiscount: 0.5,
+  /** Taxe fixe (11 €) + redevance d'acheminement (2,76 €). */
+  fixedFees: 13.76,
+  /** Chevaux fiscaux par défaut quand l'annonce ne les donne pas (estimation prudente). */
+  defaultCv: { citadine: 5, compacte: 6, suv: 7, premium: 8, moto: 5 },
+};
+
 // ---------------------------------------------------------------------------
 // 3. Cibles de chasse (filtres des onglets)
 // ---------------------------------------------------------------------------
@@ -334,8 +387,12 @@ export const NEGOTIATION_LEVERS = [
   },
 ];
 
-/** Bornes de la remise demandée dans le script de négociation. */
-export const NEGOTIATION_RANGE = { min: 500, max: 1000, step: 50 };
+/**
+ * Remise demandée dans le script de négociation : ~10 % du prix (la marge se fait à l'achat),
+ * +5 % quand l'annonce traîne depuis 15 jours, jamais moins de 800 € ni plus de 2 500 €.
+ * Sur les petits prix, plafond à 15 % (20 % pour le plancher) pour rester crédible.
+ */
+export const NEGOTIATION_RANGE = { min: 800, max: 2500, step: 50, targetRate: 0.1, staleRate: 0.05, maxRate: 0.15, floorMaxRate: 0.2 };
 
 // ---------------------------------------------------------------------------
 // 7. Dépôt-Vente / Mandat (zéro trésorerie)

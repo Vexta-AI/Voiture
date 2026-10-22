@@ -29,12 +29,12 @@ export function KpiBar({ tab, items }: { tab: TabKey; items: ScoredListing[] }) 
   const pepites = items.filter((s) => s.analysis.status.key === 'PEPITE');
   const watch = items.filter((s) => s.analysis.status.key === 'SURVEILLER');
   const refused = items.filter((s) => s.analysis.blacklist.length > 0);
-  const potential = pepites.reduce((sum, s) => sum + s.analysis.finance.netMargin, 0);
+  const potential = pepites.reduce((sum, s) => sum + s.analysis.finance.realNetMargin, 0);
   return (
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <Kpi label="Annonces scannées" value={String(items.length)} sub={`${watch.length} à surveiller`} />
       <Kpi label="🔥 Pépites potentielles" value={String(pepites.length)} sub="au-dessus du seuil de marge" accent />
-      <Kpi label="Marge nette cumulée (pépites)" value={eur(potential)} sub="au prix affiché, avant négo" accent />
+      <Kpi label="Marge réelle cumulée (pépites)" value={eur(potential)} sub="carte grise déduite, avant négo" accent />
       <Kpi label="Blacklist évitée" value={String(refused.length)} sub="moteurs poison & mots-clés" />
     </section>
   );

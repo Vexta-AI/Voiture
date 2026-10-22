@@ -21,6 +21,7 @@ export function ListingCard({
   onMessage,
   onOutreach,
   onRemove,
+  crm,
 }: {
   item: ScoredListing;
   mode?: 'hunt' | 'mandate';
@@ -28,6 +29,8 @@ export function ListingCard({
   /** Message autonome via /api/outreach : fiches PÉPITE, et fiches mandat (J+15). */
   onOutreach?: (item: ScoredListing) => void;
   onRemove?: (id: string) => void;
+  /** Ajout au CRM (absent si le CRM n'est pas branché). */
+  crm?: { inCrm: boolean; onAdd: (item: ScoredListing, kind: 'achat' | 'mandat') => void };
 }) {
   const { listing, analysis } = item;
   const [open, setOpen] = useState(false);
@@ -58,6 +61,11 @@ export function ListingCard({
               <Chip tone={analysis.zone === 'france' ? 'amber' : 'green'} title={analysis.zone === 'france' ? 'Hors zone prioritaire : rapatriement déduit' : 'Zone prioritaire'}>
                 {analysis.zone === 'france' ? '🚚 ' : '📍 '}
                 {analysis.distanceKm} km
+              </Chip>
+            )}
+            {analysis.areaType === 'campagne' && (
+              <Chip tone="green" title={`${analysis.cityKm} km de ${analysis.nearestCity} : prix de campagne, revente en ville`}>
+                🌾 Campagne
               </Chip>
             )}
           </div>
@@ -93,9 +101,11 @@ export function ListingCard({
             </>
           ) : (
             <>
-              <dt className="text-[11px] uppercase tracking-wide text-ink-400">Marge nette</dt>
+              <dt className="text-[11px] uppercase tracking-wide text-ink-400" title="Après remise en état, capital risque, carte grise et rapatriement">
+                Marge réelle
+              </dt>
               <dd className={cn('tabular text-sm font-bold', MARGIN_TONE[analysis.status.key])}>
-                {refused ? '—' : signedEur(f.transportCost > 0 ? f.netMarginAfterTransport : f.netMargin)}
+                {refused ? '—' : signedEur(f.realNetMargin)}
               </dd>
             </>
           )}
@@ -164,7 +174,18 @@ export function ListingCard({
             <button type="button" className="btn-ghost px-2 text-xs" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
               {open ? 'Masquer le détail' : mode === 'mandate' ? 'Détail du mandat' : 'Détail du calcul'}
             </button>
-            <div className="ml-auto flex gap-2">
+            <div className="ml-auto flex flex-wrap justify-end gap-2">
+              {crm && !refused && (
+                <button
+                  type="button"
+                  className="btn-secondary text-xs"
+                  disabled={crm.inCrm}
+                  onClick={() => crm.onAdd(item, mode === 'mandate' ? 'mandat' : 'achat')}
+                  title="Suivre ce véhicule dans le CRM : messages, relances, papiers"
+                >
+                  {crm.inCrm ? '✓ Dans le CRM' : '+ CRM'}
+                </button>
+              )}
               {!refused && mode === 'hunt' && (
                 <button type="button" className="btn-secondary text-xs" onClick={() => onMessage(item, 'negotiation')}>
                   Script de négo

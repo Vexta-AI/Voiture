@@ -5,7 +5,7 @@
  * stratégie retenue, chiffres clés, message prêt à envoyer et alternative éventuelle.
  *
  * Stratégies :
- *   - "negotiation" : achat-revente d'une PÉPITE (négo 500-1 000 €, virement instantané)
+ *   - "negotiation" : achat-revente d'une PÉPITE (négo ~10 %, 800-2 500 €, virement instantané)
  *   - "mandate"     : dépôt-vente pour une annonce en ligne depuis 15 jours ou plus
  * En mode "auto", si les deux sont possibles, la plus rentable gagne
  * (marge nette négociée vs revenu du mandat ; à égalité, le mandat : zéro trésorerie).
@@ -36,7 +36,7 @@ export function eligibleStrategies(analysis) {
 function strategyReason(strategy, analysis, strategies) {
   if (strategies.length < 2) {
     return strategy === 'negotiation'
-      ? `PÉPITE : marge nette ${analysis.finance.netMargin} € > seuil ${analysis.threshold} €.`
+      ? `PÉPITE : marge réelle ${analysis.finance.realNetMargin} € > seuil ${analysis.threshold} €.`
       : `En ligne depuis ${analysis.daysOnline} jours : mandat sans trésorerie.`;
   }
   const buy = analysis.finance.negotiatedNetMargin;
@@ -114,6 +114,11 @@ export function buildOutreachPayload(listing, analysis, options = {}) {
       threshold: analysis.threshold,
       grossMargin: analysis.finance.grossMargin,
       netMargin: analysis.finance.netMargin,
+      realNetMargin: analysis.finance.realNetMargin,
+      registrationCost: analysis.finance.registrationCost,
+      transportCost: analysis.finance.transportCost,
+      maxBuyPrice: analysis.finance.maxBuyPriceForPepite,
+      walkAwayPrice: analysis.finance.walkAwayPrice,
       negotiatedNetMargin: analysis.finance.negotiatedNetMargin,
     },
     negotiation: negotiation && {

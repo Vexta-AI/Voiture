@@ -2,7 +2,7 @@
  * GÉNÉRATEUR DE SCRIPTS & MESSAGES VENDEUR
  *
  * - Message de négociation : pointe les défauts détectés (rayure, calandre,
- *   consommables...) pour obtenir une baisse de 500 € à 1 000 €.
+ *   consommables...) pour obtenir une baisse d'environ 10 % (800 € à 2 500 €).
  * - Proposition de Mandat / Dépôt-Vente : pour les annonces en ligne depuis
  *   15 jours ou plus (vente plus chère via le pro, zéro avance, gestion complète).
  *
@@ -20,15 +20,27 @@ function vehicleName(listing) {
 }
 
 /**
- * Remise demandée : somme des leviers, bornée à [500 € ; 1 000 €], arrondie à 50 €.
+ * Bornes de remise pour un prix affiché : [800 € ; 2 500 €], ramenées à 20 % / 15 % du prix sur les petits budgets.
+ * @param {number} price
+ */
+export function negotiationBounds(price) {
+  const { min, max, maxRate, floorMaxRate } = NEGOTIATION_RANGE;
+  const low = Math.min(min, price * floorMaxRate);
+  return { low, high: Math.max(low, Math.min(max, price * maxRate)) };
+}
+
+/**
+ * Remise demandée : le plus fort entre ~10 % du prix et la somme des leviers, +5 % à J+15, bornée, arrondie à 50 €.
  * @param {ReturnType<import('./scoring.js').scoreListing>} analysis
  */
 export function negotiationDiscount(analysis) {
-  const { min, max, step } = NEGOTIATION_RANGE;
-  const base = analysis.finance.leversTotal > 0 ? analysis.finance.leversTotal : min;
-  // Annonce ancienne : on pousse la remise vers le haut de la fourchette.
-  const ageBoost = analysis.daysOnline >= MANDATE.minDaysOnline ? 200 : 0;
-  return clamp(roundTo(base + ageBoost, step), min, max);
+  const { step, targetRate, staleRate } = NEGOTIATION_RANGE;
+  const price = analysis.finance.askingPrice;
+  const { low, high } = negotiationBounds(price);
+  const base = Math.max(analysis.finance.leversTotal, price * targetRate);
+  // Annonce ancienne : vendeur fatigué, on pousse la remise vers le haut de la fourchette.
+  const ageBoost = analysis.daysOnline >= MANDATE.minDaysOnline ? price * staleRate : 0;
+  return clamp(roundTo(base + ageBoost, step), low, high);
 }
 
 /**
@@ -39,10 +51,11 @@ export function negotiationDiscount(analysis) {
 export function generateNegotiationMessage(listing, analysis, options = {}) {
   const tone = options.tone ?? 'direct';
   const signature = options.signature ?? 'Cordialement';
-  const { max, step } = NEGOTIATION_RANGE;
+  const { step } = NEGOTIATION_RANGE;
+  const { high } = negotiationBounds(listing.price);
   // Offre arrondie au palier inférieur : la remise réelle reste >= la remise visée, sans dépasser le plafond.
   let offer = Math.floor((listing.price - negotiationDiscount(analysis)) / step) * step;
-  if (listing.price - offer > max) offer = Math.ceil((listing.price - max) / step) * step;
+  if (listing.price - offer > high) offer = Math.ceil((listing.price - high) / step) * step;
   // PureTech : le plafond -30 % de la cote prime sur la fourchette de négo.
   if (analysis.puretechCondition) offer = Math.min(offer, Math.floor(analysis.puretechCondition.maxBuyPrice / step) * step);
   const discount = listing.price - offer;
