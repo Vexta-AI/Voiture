@@ -24,6 +24,7 @@ const RUNS_PREFIX = 'radar/runs/';
 const ALERTS_PREFIX = 'radar/alerts/';
 const BATCHES_PREFIX = 'radar/batches/';
 const CLAIMS_PREFIX = 'radar/claims/';
+const LOG_PREFIX = 'radar/log/';
 
 export const storeEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
@@ -124,4 +125,39 @@ export async function releaseSource(batchId: string, key: string) {
 
 export async function markAlertSent(key: string, data: unknown) {
   await writeJson(`${ALERTS_PREFIX}${key}.json`, { sentAt: new Date().toISOString(), ...(data as object) }, true);
+}
+
+/** Journal d'un retour Apify (un fichier par webhook, jamais réécrit). */
+export async function logIngest(entry: Record<string, unknown>) {
+  const at = new Date().toISOString();
+  const safe = String(entry.source ?? 'unknown').replace(/[^a-zA-Z0-9-]/g, '_');
+  await writeJson(`${LOG_PREFIX}${at.slice(0, 10)}/${at.replace(/[:.]/g, '-')}-${safe}.json`, { at, ...entry }, true);
+}
+
+/** Derniers retours Apify journalisés, du plus récent au plus ancien. */
+export async function recentIngestLogs(limit = 50) {
+  const blobs = (await listAll(LOG_PREFIX)).sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()).slice(0, limit);
+  const logs = await Promise.all(blobs.map((b) => readJson<Record<string, unknown>>(b.pathname).catch(() => null)));
+  return logs.filter((l): l is Record<string, unknown> => l !== null);
+}
+
+/** Avancement d'un lot : sources lancées (réservées) sur le total. */
+export async function batchProgress(batchId: string) {
+  const batch = await loadBatch(batchId);
+  if (!batch) return null;
+  const claimed = (await listAll(`${CLAIMS_PREFIX}${batchId}/`)).length;
+  return { batchId, total: batch.keys.length, launched: claimed };
+}
+
+/** Nombre de runs stockés et d'annonces, par source. */
+export async function runsSummary(days: number) {
+  const runs = await loadRuns(days);
+  const bySource: Record<string, { runs: number; listings: number; last: string }> = {};
+  for (const r of runs) {
+    const s = (bySource[r.source] ??= { runs: 0, listings: 0, last: r.fetchedAt });
+    s.runs += 1;
+    s.listings += r.listings.length;
+    if (r.fetchedAt > s.last) s.last = r.fetchedAt;
+  }
+  return bySource;
 }
