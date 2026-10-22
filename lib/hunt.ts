@@ -24,6 +24,8 @@ export function huntConfig() {
     maxItems: Number(env.HUNT_MAX_ITEMS) || HUNT_LIMITS.maxItems,
     maxChargeUsd: Number(env.APIFY_MAX_CHARGE_USD) || HUNT_LIMITS.maxChargeUsd,
     customSources: env.HUNT_SOURCES,
+    /** Fourni par Vercel quand "Protection Bypass for Automation" est activé sur le projet. */
+    bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET || undefined,
   };
 }
 
@@ -75,6 +77,7 @@ export async function startHunt(options: { now?: Date; includeMarket?: boolean }
         webhookUrl: `${config.appUrl}/api/hunt/ingest`,
         webhookSecret: config.ingestSecret,
         maxChargeUsd: config.maxChargeUsd,
+        bypassSecret: config.bypassSecret,
       }),
     ),
   );
