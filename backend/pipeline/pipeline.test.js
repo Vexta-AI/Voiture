@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { DEFAULT_AREA, defaultSources, parseArea } from '../config/sources.js';
+import { DEFAULT_AREA, defaultSources, parseArea, parseTypes } from '../config/sources.js';
 import { getDatasetItems, isCapacityError, startRun } from './apify.js';
 import { alertKey, priceListings, selectAlerts } from './hunt.js';
 import { estimateMarketPrice, modelKey } from './market.js';
@@ -218,6 +218,15 @@ describe('Apify & sources', () => {
     assert.ok(weekly.some((s) => s.key === 'stale-auto') && weekly.some((s) => s.key === 'stale-moto'));
     assert.ok(weekly.filter((s) => s.kind === 'market').length >= 10);
     assert.equal(new Set(weekly.map((s) => s.key)).size, weekly.length, 'clés uniques');
+  });
+
+  it('types : "auto" ne chasse que les voitures (hebdo compris)', () => {
+    assert.deepEqual(parseTypes('auto'), ['auto']);
+    assert.deepEqual(parseTypes(' Auto , moto '), ['auto', 'moto']);
+    assert.equal(parseTypes('bateau'), null);
+    assert.equal(parseTypes(undefined), null);
+    const autoOnly = defaultSources({ includeWeekly: true, types: ['auto'] });
+    assert.ok(autoOnly.length > 0 && autoOnly.every((s) => s.type === 'auto'));
   });
 
   it('zone : parse "lat,lng,rayonKm" et rejette les valeurs absurdes', () => {

@@ -21,7 +21,7 @@ Déploiement Vercel : importer le repo, aucun réglage requis. Variables optionn
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | alertes PÉPITE / Mandat avec message prêt à copier |
 | `CRON_SECRET` / `INGEST_SECRET` | secrets du cron et du webhook Apify (générés à la création du projet) |
 | `BLOB_READ_WRITE_TOKEN` | stockage Vercel Blob (posé par l'intégration Blob) |
-| `HUNT_AREA`, `HUNT_MAX_ITEMS`, `HUNT_MARKET_MAX_ITEMS`, `APIFY_MAX_CHARGE_USD`, `HUNT_SOURCES` | réglages de la chasse (optionnels) |
+| `HUNT_TYPES` (`auto` ou `auto,moto`), `HUNT_AREA`, `HUNT_MAX_ITEMS`, `HUNT_MARKET_MAX_ITEMS`, `APIFY_MAX_CHARGE_USD`, `HUNT_SOURCES` | réglages de la chasse (optionnels) |
 | `DASHBOARD_PASSWORD` | protège tout le site par mot de passe (identifiant libre) ; `/api/hunt/*` garde ses propres secrets |
 | `ANTHROPIC_API_KEY` | active « Affiner avec l'IA » dans l'éditeur de messages |
 | `OUTREACH_API_KEY` | clé exigée (en-tête `x-api-key`) pour pousser un payload vers Make |

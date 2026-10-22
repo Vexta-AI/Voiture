@@ -98,6 +98,15 @@ function lbcSearchUrl({ type, area, order }) {
  * @property {Record<string, unknown>} input  input du scraper (hors proxy)
  */
 
+/** "auto" / "auto,moto" -> types chassés ; null si vide ou invalide. */
+export function parseTypes(value) {
+  const types = String(value ?? '')
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => t === 'auto' || t === 'moto');
+  return types.length ? /** @type {('auto'|'moto')[]} */ ([...new Set(types)]) : null;
+}
+
 /** "44.90,-0.74,200" -> { lat, lng, radiusKm } ; null si invalide. */
 export function parseArea(value) {
   const parts = String(value ?? '').split(',').map((p) => Number(p.trim()));
@@ -108,7 +117,7 @@ export function parseArea(value) {
 }
 
 /**
- * @param {{ area?: { lat: number, lng: number, radiusKm: number }, maxItems?: number, marketMaxItems?: number, includeWeekly?: boolean }} [options]
+ * @param {{ area?: { lat: number, lng: number, radiusKm: number }, maxItems?: number, marketMaxItems?: number, includeWeekly?: boolean, types?: ('auto'|'moto')[] }} [options]
  * @returns {HuntSource[]}
  */
 export function defaultSources(options = {}) {
@@ -118,14 +127,15 @@ export function defaultSources(options = {}) {
 
   /** @type {HuntSource[]} */
   const sources = [];
-  for (const type of /** @type {const} */ (['auto', 'moto'])) {
+  const types = options.types?.length ? options.types : /** @type {('auto'|'moto')[]} */ (['auto', 'moto']);
+  for (const type of types) {
     sources.push({ key: `fresh-${type}`, kind: 'fresh', type, input: { searchUrl: lbcSearchUrl({ type, area, order: 'desc' }), maxItems } });
     if (options.includeWeekly) {
       sources.push({ key: `stale-${type}`, kind: 'stale', type, input: { searchUrl: lbcSearchUrl({ type, area, order: 'asc' }), maxItems } });
     }
   }
   if (options.includeWeekly) {
-    for (const type of /** @type {const} */ (['auto', 'moto'])) {
+    for (const type of types) {
       const targets = type === 'auto' ? AUTO_TARGETS : MOTO_TARGETS;
       const { min, max } = BUDGETS[type];
       for (const target of targets) {
