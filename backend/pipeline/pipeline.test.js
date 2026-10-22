@@ -270,13 +270,11 @@ describe('Apify & sources', () => {
   it('sources : fresh chaque jour, stale + comparables chaque semaine', () => {
     const daily = defaultSources();
     assert.deepEqual(daily.map((s) => s.key), ['fresh-auto', 'fresh-auto-fr', 'fresh-moto', 'fresh-moto-fr']);
-    assert.equal(new URL(daily[1].input.searchUrl).searchParams.get('lat'), null, 'recherche nationale sans zone');
+    assert.equal(new URL(daily[1].input.searchUrl).searchParams.get('locations'), null, 'recherche nationale sans zone');
     const url = new URL(daily[0].input.searchUrl);
     assert.equal(url.origin + url.pathname, 'https://www.leboncoin.fr/recherche');
     assert.equal(url.searchParams.get('category'), '2');
-    assert.equal(url.searchParams.get('lat'), String(DEFAULT_AREA.lat));
-    assert.equal(url.searchParams.get('lng'), String(DEFAULT_AREA.lng));
-    assert.equal(url.searchParams.get('radius'), '200000');
+    assert.equal(url.searchParams.get('locations'), `Bordeaux_33000__${DEFAULT_AREA.lat}_${DEFAULT_AREA.lng}_9256_200000`);
     assert.equal(url.searchParams.get('price'), '3000-30000');
     assert.equal(new URL(daily[2].input.searchUrl).searchParams.get('category'), '3');
     const weekly = defaultSources({ includeWeekly: true });
