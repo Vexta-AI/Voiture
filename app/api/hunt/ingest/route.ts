@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { secretMatches } from '@/lib/auth';
 import { continueBatch, huntConfig, ingestRun, missingConfig } from '@/lib/hunt';
+import { logIngest } from '@/lib/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
   }
   // Le run est terminé (succès ou échec) : un créneau Apify se libère, on lance la recherche suivante du lot.
   const next = batch ? await continueBatch(batch).catch((error) => (console.error('[api/hunt/ingest] next', error), [])) : [];
+  await logIngest({ runId, source, batch, summary, next }).catch((error) => console.error('[api/hunt/ingest] log', error));
   // 200 même pour un run en échec : rien à rejouer côté Apify, le résumé suffit au diagnostic.
   return NextResponse.json({ ...summary, next }, { status: summary.ok === false && summary.error === 'ingest_failed' ? 500 : 200 });
 }
