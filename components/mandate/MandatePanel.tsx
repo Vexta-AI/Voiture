@@ -1,4 +1,4 @@
-import { eur, pct, signedEur } from '@/lib/format';
+import { eur, signedEur } from '@/lib/format';
 import type { Analysis } from '@/lib/types';
 
 /** Économie du mandat de dépôt-vente : commission + upsells, zéro trésorerie. */
@@ -14,7 +14,9 @@ export function MandatePanel({ analysis }: { analysis: Analysis }) {
           <span className="tabular font-medium">{eur(m.salePrice)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Commission ({pct(m.commissionRate)}, min. 500 €)</span>
+          <span>
+            Commission <span className="text-xs text-ink-400">(plus-value au-dessus du prix net)</span>
+          </span>
           <span className="tabular">{eur(m.commission)}</span>
         </div>
         {m.upsells.map((u) => (
@@ -27,7 +29,7 @@ export function MandatePanel({ analysis }: { analysis: Analysis }) {
         ))}
         <div className="flex justify-between border-t border-ink-100 pt-1 font-semibold">
           <span>Revenu net du mandat</span>
-          <span className="tabular text-emerald-700">{eur(m.totalRevenue)}</span>
+          <span className="tabular text-emerald-700 dark:text-emerald-300">{eur(m.totalRevenue)}</span>
         </div>
         <div className="flex justify-between text-ink-500">
           <span>Trésorerie mobilisée</span>
@@ -37,7 +39,7 @@ export function MandatePanel({ analysis }: { analysis: Analysis }) {
       <div className="space-y-1 text-sm">
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">Côté propriétaire</p>
         <div className="flex justify-between">
-          <span>Net vendeur estimé</span>
+          <span>Prix net garanti</span>
           <span className="tabular font-medium">{eur(m.ownerNet)}</span>
         </div>
         <div className="flex justify-between text-ink-600">
@@ -50,7 +52,7 @@ export function MandatePanel({ analysis }: { analysis: Analysis }) {
           {m.ownerGainVsAd < 0 && (
             <>
               <br />
-              Net vendeur sous son prix : argumenter sur la vitesse, la sécurité et la garantie plutôt que sur le prix.
+              Prix net sous son annonce (plus-value min. {eur(m.minSpread)}) : argumenter sur la vitesse, zéro curieux et la garantie.
             </>
           )}
         </div>

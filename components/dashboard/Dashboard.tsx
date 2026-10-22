@@ -7,6 +7,8 @@ import { scoreListings } from '@/backend/utils/scoring.js';
 import { AnalyzerDrawer } from '@/components/analyzer/AnalyzerDrawer';
 import { ListingCard, type MessageKind } from '@/components/listing/ListingCard';
 import { MessageModal } from '@/components/messages/MessageModal';
+import { OutreachModal } from '@/components/messages/OutreachModal';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import type { Listing, ScoredListing, StatusKey, TabKey } from '@/lib/types';
 
 import { FilterBar, type SortKey, type StatusFilter } from './FilterBar';
@@ -41,6 +43,7 @@ export function Dashboard({ initialListings }: { initialListings: Listing[] }) {
   const [sort, setSort] = useState<SortKey>('score');
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState<{ item: ScoredListing; kind: MessageKind } | null>(null);
+  const [outreach, setOutreach] = useState<ScoredListing | null>(null);
   const [analyzerOpen, setAnalyzerOpen] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(false);
 
@@ -111,20 +114,23 @@ export function Dashboard({ initialListings }: { initialListings: Listing[] }) {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-ink-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+      <header className="sticky top-0 z-30 border-b border-ink-200 bg-surface/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink-900 text-lg text-white" aria-hidden>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink-900 text-lg text-surface" aria-hidden>
               ◎
             </div>
             <div>
               <h1 className="text-base font-semibold leading-tight text-ink-900">Pépite Radar</h1>
-              <p className="text-xs text-ink-500">Veille · scoring · décision — Achat-revente & mandat Auto/Moto · Bordeaux & région</p>
+              <p className="hidden text-xs text-ink-500 sm:block">Veille · scoring · décision — Achat-revente & mandat Auto/Moto · Bordeaux & région</p>
             </div>
           </div>
-          <button type="button" className="btn-primary" onClick={() => setAnalyzerOpen(true)}>
-            + Analyser une annonce
-          </button>
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            <button type="button" className="btn-primary" onClick={() => setAnalyzerOpen(true)}>
+              + Analyser<span className="hidden sm:inline"> une annonce</span>
+            </button>
+          </div>
         </div>
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <TabNav tabs={TABS} active={tab} counts={counts} onChange={(t) => { setTab(t); setStatus('ALL'); }} />
@@ -175,6 +181,7 @@ export function Dashboard({ initialListings }: { initialListings: Listing[] }) {
                 item={item}
                 mode={tab === 'mandat' ? 'mandate' : 'hunt'}
                 onMessage={(it, kind) => setMessage({ item: it, kind })}
+                onOutreach={setOutreach}
                 onRemove={userIds.has(item.listing.id) ? (id) => persist(userListings.filter((l) => l.id !== id)) : undefined}
               />
             ))}
@@ -182,12 +189,13 @@ export function Dashboard({ initialListings }: { initialListings: Listing[] }) {
         )}
 
         <footer className="pt-4 text-center text-xs text-ink-400">
-          Marge nette = Cote pro (+ options) − Prix affiché − 350 € remise en état − 200 € capital risque. Règle d’or : viser la moyenne du
+          Marge nette = Cote pro − Prix affiché − 350 € remise en état − 200 € capital risque. Règle d’or : viser la moyenne du
           marché, jamais le prix le plus haut.
         </footer>
       </main>
 
       <MessageModal item={message?.item ?? null} kind={message?.kind ?? 'negotiation'} aiEnabled={aiEnabled} onClose={() => setMessage(null)} />
+      <OutreachModal item={outreach} onClose={() => setOutreach(null)} />
       <AnalyzerDrawer open={analyzerOpen} onClose={() => setAnalyzerOpen(false)} onAdd={(l) => persist([l, ...userListings])} />
     </div>
   );

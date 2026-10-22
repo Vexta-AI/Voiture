@@ -21,7 +21,6 @@ export function MarginBreakdown({ analysis }: { analysis: Analysis }) {
       <div>
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">Au prix affiché</p>
         <Row label="Cote marché pro" value={eur(f.marketPrice)} />
-        {f.triggersBonus > 0 && <Row label="Bonus options" value={signedEur(f.triggersBonus)} muted />}
         <Row label="Prix affiché" value={`− ${eur(f.askingPrice)}`} muted />
         <Row label="Marge brute" value={signedEur(f.grossMargin)} strong />
         <Row label="Remise en état" value={`− ${eur(f.reconditioning)}`} muted hint="detailing + petite méca" />
@@ -29,6 +28,9 @@ export function MarginBreakdown({ analysis }: { analysis: Analysis }) {
         <div className="mt-1 border-t border-ink-100 pt-1">
           <Row label="Marge nette estimée" value={signedEur(f.netMargin)} strong />
         </div>
+        {f.triggersBonus > 0 && (
+          <Row label="Potentiel options (hors statut)" value={signedEur(f.triggersBonus)} muted hint="argument de revente" />
+        )}
       </div>
       <div>
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">Scénario négocié</p>

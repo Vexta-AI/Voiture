@@ -5,7 +5,7 @@ function Kpi({ label, value, sub, accent }: { label: string; value: string; sub?
   return (
     <div className="card px-4 py-3">
       <p className="text-xs font-medium text-ink-500">{label}</p>
-      <p className={`tabular mt-1 text-xl font-semibold ${accent ? 'text-emerald-600' : 'text-ink-900'}`}>{value}</p>
+      <p className={`tabular mt-1 text-xl font-semibold ${accent ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-900'}`}>{value}</p>
       {sub && <p className="mt-0.5 text-xs text-ink-400">{sub}</p>}
     </div>
   );
@@ -19,7 +19,7 @@ export function KpiBar({ tab, items }: { tab: TabKey; items: ScoredListing[] }) 
     return (
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Vendeurs fatigués (J+15)" value={String(items.length)} sub={`${avgDays} jours en ligne en moyenne`} />
-        <Kpi label="Revenu mandats potentiel" value={eur(revenue)} sub="commissions + upsells" accent />
+        <Kpi label="Revenu mandats potentiel" value={eur(revenue)} sub="plus-values + upsells" accent />
         <Kpi label="Dont upsells" value={eur(upsells)} sub="detailing +70 € · entretien +100 €" />
         <Kpi label="Trésorerie mobilisée" value={eur(0)} sub="sans-stock, zéro avance" />
       </section>

@@ -177,7 +177,7 @@ export function AnalyzerDrawer({ open, onClose, onAdd }: { open: boolean; onClos
                 ))}
               </div>
               {analysis.warnings.map((w) => (
-                <p key={w} className="text-xs text-amber-800">
+                <p key={w} className="text-xs text-amber-800 dark:text-amber-300">
                   ⚠ {w}
                 </p>
               ))}

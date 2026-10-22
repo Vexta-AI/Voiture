@@ -37,11 +37,15 @@ export function negotiationDiscount(analysis) {
  * @param {{ tone?: 'courtois'|'direct', signature?: string }} [options]
  */
 export function generateNegotiationMessage(listing, analysis, options = {}) {
-  const tone = options.tone ?? 'courtois';
+  const tone = options.tone ?? 'direct';
   const signature = options.signature ?? 'Cordialement';
-  const discount = negotiationDiscount(analysis);
-  let offer = roundTo(listing.price - discount, 50);
-  if (analysis.puretechCondition) offer = Math.min(offer, roundTo(analysis.puretechCondition.maxBuyPrice, 50));
+  const { max, step } = NEGOTIATION_RANGE;
+  // Offre arrondie au palier inférieur : la remise réelle reste >= la remise visée, sans dépasser le plafond.
+  let offer = Math.floor((listing.price - negotiationDiscount(analysis)) / step) * step;
+  if (listing.price - offer > max) offer = Math.ceil((listing.price - max) / step) * step;
+  // PureTech : le plafond -30 % de la cote prime sur la fourchette de négo.
+  if (analysis.puretechCondition) offer = Math.min(offer, Math.floor(analysis.puretechCondition.maxBuyPrice / step) * step);
+  const discount = listing.price - offer;
   const name = vehicleName(listing);
   const levers = analysis.levers;
 
@@ -49,8 +53,8 @@ export function generateNegotiationMessage(listing, analysis, options = {}) {
   lines.push(tone === 'direct' ? 'Bonjour,' : 'Bonjour, j’espère que vous allez bien.');
   lines.push('');
   lines.push(
-    `Votre ${name} de ${listing.year} (${listing.mileage.toLocaleString('fr-FR')} km) m’intéresse sérieusement. ` +
-      'Je suis acheteur rapide : paiement par virement instantané et déplacement sous 48 h sur le secteur.',
+    `Votre ${name} de ${listing.year} (${listing.mileage.toLocaleString('fr-FR')} km) m’intéresse et je peux conclure très vite : ` +
+      'paiement immédiat par virement instantané (fonds reçus en quelques secondes) et déplacement sous 48 h sur le secteur.',
   );
   lines.push('');
 
@@ -85,13 +89,13 @@ export function generateNegotiationMessage(listing, analysis, options = {}) {
 
   lines.push(
     tone === 'direct'
-      ? `Mon offre : ${eur(offer)}, paiement immédiat. Disponible pour voir le véhicule dès cette semaine.`
+      ? `Mon offre ferme : ${eur(offer)}, payés immédiatement par virement instantané le jour de la vente. Je suis disponible dès cette semaine.`
       : `Dans ces conditions, je peux vous proposer ${eur(offer)}, avec un paiement immédiat le jour de la vente. Seriez-vous ouvert à en discuter ?`,
   );
   lines.push('');
   lines.push(signature);
 
-  return { text: lines.join('\n'), offer, discount };
+  return { subject: `${name} : offre ferme à ${eur(offer)}, virement instantané`, text: lines.join('\n'), offer, discount };
 }
 
 /**
@@ -101,28 +105,39 @@ export function generateNegotiationMessage(listing, analysis, options = {}) {
  */
 export function generateMandateMessage(listing, analysis, options = {}) {
   const signature = options.signature ?? 'Cordialement';
-  const company = options.company ?? 'notre structure de dépôt-vente';
+  const company = options.company ?? 'notre service de dépôt-vente';
   const name = vehicleName(listing);
   const mandate = analysis.mandate;
-  const salePrice = mandate?.salePrice ?? listing.price;
+  const salePrice = mandate?.salePrice ?? listing.marketPrice;
+  const ownerNet = mandate?.ownerNet ?? listing.price;
+
+  const netLine =
+    ownerNet >= listing.price
+      ? `• Vous fixez votre prix net : ${eur(ownerNet)}, soit le prix de votre annonce. C'est la somme que vous touchez, garantie par écrit.`
+      : `• Vous touchez un prix net garanti par écrit, autour de ${eur(ownerNet)}, fixé ensemble selon le marché actuel.`;
 
   const lines = [
     'Bonjour,',
     '',
-    `Je vois que votre ${name} est en ligne depuis ${analysis.daysOnline} jours. Entre les appels sans suite, les curieux et les essais qui n’aboutissent pas, vendre seul prend du temps et de l’énergie.`,
+    `Votre ${name} est en ligne depuis ${analysis.daysOnline} jours. Je vous propose de vous décharger complètement de la vente via ${company}, sans que vous ayez à avancer un centime.`,
     '',
-    `Je vous propose de m’en occuper via ${company}, en dépôt-vente :`,
-    `• Vente plus chère grâce au statut professionnel : prix de vente visé autour de ${eur(salePrice)}, avec garantie mécanique proposée à l’acheteur (c’est ce qui rassure et fait payer le juste prix).`,
-    '• Zéro avance d’argent de votre part : vous ne payez rien avant la vente.',
-    '• Gestion complète : photos pro, diffusion des annonces, filtrage des appels, essais, paperasse (cession, carte grise).',
-    `• Mandat clair : exclusivité de ${MANDATE.exclusivityDays} jours, conditions écrites, vous restez propriétaire jusqu’à la vente.`,
+    netLine,
+    `• Nous la vendons plus cher grâce au statut pro (prix visé autour de ${eur(salePrice)}) avec une garantie mécanique pour l'acheteur, ce qui fait accepter le juste prix.`,
+    '• Notre rémunération : uniquement la plus-value réalisée au-dessus de votre prix net. Si nous ne vendons pas au-dessus, nous ne gagnons rien.',
+    '• Zéro gestion des curieux : nous filtrons les appels, organisons les visites et les essais, et gérons toute la paperasse (cession, carte grise).',
+    "• Zéro avance d'argent : aucun frais à payer avant la vente.",
+    `• Mandat simple et clair : exclusivité de ${MANDATE.exclusivityDays} jours, vous restez propriétaire jusqu'à la vente.`,
     '',
-    'En option, nous pouvons aussi remettre le véhicule à son meilleur niveau avant la mise en vente (detailing complet, entretien), ce qui accélère la vente.',
-    '',
-    'Seriez-vous disponible pour un appel de 5 minutes cette semaine afin que je vous détaille le fonctionnement ?',
+    'Un appel de 5 minutes cette semaine pour en parler ?',
     '',
     signature,
   ];
 
-  return { text: lines.join('\n'), salePrice };
+  return {
+    subject: `Votre ${listing.brand} ${listing.model} : vendue plus cher, sans les curieux`,
+    text: lines.join('\n'),
+    salePrice,
+    ownerNet,
+    commission: mandate?.commission ?? Math.max(0, salePrice - ownerNet),
+  };
 }

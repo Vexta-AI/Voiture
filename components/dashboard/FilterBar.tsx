@@ -53,7 +53,7 @@ export function FilterBar({
                 title={t.family ?? (t.cursus ? 'Cible cursus (budget intermédiaire)' : undefined)}
                 className={cn(
                   'rounded-full border px-3 py-1 text-xs font-medium transition',
-                  on ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 bg-white text-ink-600 hover:border-ink-300',
+                  on ? 'border-ink-900 bg-ink-900 text-surface' : 'border-ink-200 bg-surface text-ink-600 hover:border-ink-300',
                 )}
               >
                 {t.label}
@@ -64,7 +64,7 @@ export function FilterBar({
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border border-ink-200 bg-white p-0.5">
+        <div className="inline-flex rounded-lg border border-ink-200 bg-surface p-0.5">
           {STATUS_OPTIONS.map((o) => (
             <button
               key={o.key}
@@ -72,7 +72,7 @@ export function FilterBar({
               onClick={() => onStatus(o.key)}
               className={cn(
                 'rounded-md px-2.5 py-1 text-xs font-medium transition',
-                status === o.key ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-50',
+                status === o.key ? 'bg-ink-900 text-surface' : 'text-ink-600 hover:bg-ink-50',
               )}
             >
               {o.label} <span className="tabular opacity-70">{o.key === 'ALL' ? total : statusCounts[o.key]}</span>

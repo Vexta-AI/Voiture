@@ -123,7 +123,7 @@ function MessageEditor({ item, kind, aiEnabled }: { item: ScoredListing; kind: M
                 setEdited(null);
                 setSource('template');
               }}
-              className={cn('rounded-md px-3 py-1 font-medium capitalize', tone === t ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-50')}
+              className={cn('rounded-md px-3 py-1 font-medium capitalize', tone === t ? 'bg-ink-900 text-surface' : 'text-ink-600 hover:bg-ink-50')}
             >
               {t}
             </button>
@@ -138,7 +138,7 @@ function MessageEditor({ item, kind, aiEnabled }: { item: ScoredListing; kind: M
         aria-label="Message au vendeur"
       />
 
-      {notice && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{notice}</p>}
+      {notice && <p className="rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">{notice}</p>}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <button

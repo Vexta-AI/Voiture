@@ -146,6 +146,8 @@ export const BLACKLIST = {
     brands: ['volkswagen', 'vw', 'audi', 'seat', 'skoda', 'cupra'],
     /** Au-delà de cette cylindrée, la DSG7 est la DQ381 à bain d'huile (hors blacklist). */
     maxDisplacement: 1.6,
+    /** Boîtes à bain d'huile : jamais refusées, même sur mention "DSG7" (sauf DQ200 explicite). */
+    wetPattern: /(dq|dsg) ?-?(381|250|500)|bain d'?huile|embrayage humide|dsg ?6/,
   },
 };
 
@@ -280,16 +282,23 @@ export const MANDATE = {
   exclusivityDays: 30,
   /** Clause de dédit en cas de retrait anticipé (shooting + mise en ligne). */
   withdrawalPenalty: 250,
-  /** Commission dépôt-vente — paramètre ajustable (non fixé par le cursus). */
-  commission: { rate: 0.06, min: 500 },
+  /**
+   * Rémunération = plus-value au-dessus du PRIX NET vendeur :
+   *   commission = prix de vente pro - prix net garanti au propriétaire.
+   * minSpread : plus-value minimale visée (paramètre ajustable, non fixé par le cursus).
+   * Si la cote ne laisse pas cette marge au-dessus du prix affiché, le prix net
+   * proposé au propriétaire est abaissé d'autant.
+   */
+  commission: { model: 'spread', minSpread: 500 },
   upsells: [
     { id: 'detailing', label: 'Detailing', price: 150, cost: 80 },
     { id: 'entretien', label: 'Entretien', price: 180, cost: 80 },
   ],
   arguments: [
     'Vente plus chère grâce au statut pro',
-    'Gestion complète : photos, annonces, appels, essais, paperasse',
+    'Zéro gestion des curieux : appels, visites et essais filtrés',
     "Zéro avance d'argent pour le propriétaire",
+    'Commission uniquement sur la plus-value au-dessus du prix net',
     'Garantie mécanique proposée à l’acheteur',
   ],
 };

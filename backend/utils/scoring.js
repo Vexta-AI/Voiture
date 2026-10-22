@@ -214,9 +214,11 @@ function checkBlacklist(listing, text) {
     const isDsg = /dsg|s[ -]?tronic/.test(gearText);
     const displacement = parseDisplacement(listing.engine ?? listing.version ?? listing.title);
     const smallEngine = displacement !== null && displacement <= dq.maxDisplacement;
-    if (explicitDq200 || (isDsg7 && smallEngine)) {
+    // Mention explicite d'une boîte à bain d'huile (DQ381 / DQ250 / DQ500) : jamais de refus par déduction.
+    const isWet = dq.wetPattern.test(gearText) || dq.wetPattern.test(text);
+    if (explicitDq200 || (isDsg7 && smallEngine && !isWet)) {
       hits.push({ id: dq.id, label: dq.label, reason: dq.reason });
-    } else if (isDsg && (smallEngine || displacement === null) && !/dq ?381|dq ?250/.test(text)) {
+    } else if (isDsg && (smallEngine || displacement === null) && !isWet) {
       warnings.push('Boîte DSG/S tronic sur petit moteur : vérifier le code boîte (DQ200 à sec = blacklist).');
     }
   }
@@ -290,25 +292,29 @@ function detectLevers(listing, text) {
 // ---------------------------------------------------------------------------
 
 /**
- * Économie d'un mandat de dépôt-vente sur l'annonce (zéro trésorerie).
+ * Économie d'un mandat de dépôt-vente (zéro trésorerie).
+ * Le propriétaire touche un PRIX NET garanti ; le pro se rémunère sur la
+ * plus-value au-dessus de ce prix net (commission = prix de vente - prix net).
+ * Le prix de vente visé est la cote pro (règle d'or : la moyenne du marché).
  * @param {Listing} listing
  */
 export function computeMandate(listing) {
-  const salePrice = Math.max(listing.marketPrice, listing.price);
-  const commission = Math.max(MANDATE.commission.min, Math.round(salePrice * MANDATE.commission.rate));
+  const salePrice = listing.marketPrice;
+  const ownerNet = Math.min(listing.price, salePrice - MANDATE.commission.minSpread);
+  const commission = salePrice - ownerNet;
   const upsells = MANDATE.upsells.map((u) => ({ ...u, margin: u.price - u.cost }));
   const upsellMargin = upsells.reduce((sum, u) => sum + u.margin, 0);
   const upsellBilled = upsells.reduce((sum, u) => sum + u.price, 0);
-  const ownerNet = salePrice - commission - upsellBilled;
   return {
     salePrice,
+    ownerNet,
     commission,
-    commissionRate: MANDATE.commission.rate,
+    minSpread: MANDATE.commission.minSpread,
     upsells,
     upsellMargin,
     upsellBilled,
     totalRevenue: commission + upsellMargin,
-    ownerNet,
+    /** 0 = le propriétaire touche son prix affiché ; négatif = prix net à négocier sous l'annonce. */
     ownerGainVsAd: ownerNet - listing.price,
     cashRequired: 0,
     exclusivityDays: MANDATE.exclusivityDays,
@@ -342,18 +348,21 @@ export function scoreListing(listing, options = {}) {
   // --- Formule financière (stricte) ---
   const askingPrice = Number(listing.price) || 0;
   const marketPrice = Number(listing.marketPrice) || 0;
-  const resaleValue = marketPrice + triggersBonus;
-  const grossMargin = resaleValue - askingPrice;
+  // Règle d'or : la marge se calcule sur la cote pro seule. Les options sont un potentiel, jamais acquis.
+  const grossMargin = marketPrice - askingPrice;
   const fixedCosts = COSTS.RECONDITIONING_BASE + COSTS.RISK_CAPITAL;
   const netMargin = grossMargin - fixedCosts;
+  /** Valeur perçue avec options déclencheurs (argument de revente, hors statut). */
+  const resaleValue = marketPrice + triggersBonus;
+  const netMarginWithOptions = netMargin + triggersBonus;
 
   // --- Scénario négocié (leviers + coût réel des défauts) ---
   const leversTotal = levers.reduce((sum, l) => sum + l.discount, 0);
   const leversRealCost = levers.reduce((sum, l) => sum + l.realCost, 0);
   const targetPrice = Math.max(0, askingPrice - leversTotal);
-  const negotiatedNetMargin = resaleValue - targetPrice - fixedCosts - leversRealCost;
-  /** Prix d'achat maximum pour atteindre le seuil PÉPITE. */
-  const maxBuyPriceForPepite = resaleValue - fixedCosts - threshold;
+  const negotiatedNetMargin = marketPrice - targetPrice - fixedCosts - leversRealCost;
+  /** Prix d'achat maximum pour atteindre le seuil PÉPITE (marge nette strictement supérieure au seuil). */
+  const maxBuyPriceForPepite = marketPrice - fixedCosts - threshold - 1;
 
   // --- Contexte marché ---
   const inBudget = askingPrice >= budget.min && askingPrice <= budget.max;
@@ -432,6 +441,7 @@ export function scoreListing(listing, options = {}) {
       triggersBonus,
       resaleValue,
       grossMargin,
+      netMarginWithOptions,
       reconditioning: COSTS.RECONDITIONING_BASE,
       riskCapital: COSTS.RISK_CAPITAL,
       netMargin,

@@ -9,12 +9,21 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#121621',
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)', color: '#0a0d13' },
+    { media: '(prefers-color-scheme: light)', color: '#f7f8fa' },
+  ],
 };
+
+/** Applique le thème avant le premier rendu (sombre par défaut) pour éviter tout flash. */
+const THEME_SCRIPT = `try{var t=localStorage.getItem('pepite-radar:theme');if(t!=='light')document.documentElement.classList.add('dark')}catch(e){document.documentElement.classList.add('dark')}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-screen font-sans">{children}</body>
     </html>
   );

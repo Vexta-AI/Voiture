@@ -30,7 +30,7 @@ export function TabNav({
           >
             {t.label}
             <span
-              className={cn('tabular rounded-full px-1.5 py-0.5 text-[11px] font-semibold', selected ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600')}
+              className={cn('tabular rounded-full px-1.5 py-0.5 text-[11px] font-semibold', selected ? 'bg-ink-900 text-surface' : 'bg-ink-100 text-ink-600')}
               title={t.key === 'mandat' ? 'Annonces ciblables en mandat' : 'Pépites potentielles'}
             >
               {counts[t.key]}

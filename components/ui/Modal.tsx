@@ -35,10 +35,10 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label={title}>
-      <button type="button" aria-label="Fermer" className="absolute inset-0 bg-ink-900/40 backdrop-blur-[2px]" onClick={onClose} />
+      <button type="button" aria-label="Fermer" className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
       <div
         className={cn(
-          'relative flex max-h-full w-full flex-col bg-white shadow-2xl',
+          'relative flex max-h-full w-full flex-col bg-surface shadow-2xl',
           side ? 'ml-auto h-full max-w-2xl' : 'm-auto max-h-[90vh] max-w-2xl rounded-2xl',
         )}
       >

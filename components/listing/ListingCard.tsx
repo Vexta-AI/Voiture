@@ -13,22 +13,26 @@ import { MarginBreakdown } from './MarginBreakdown';
 
 export type MessageKind = 'negotiation' | 'mandate';
 
-const MARGIN_TONE = { PEPITE: 'text-emerald-600', SURVEILLER: 'text-amber-600', REFUSE: 'text-rose-600' } as const;
+const MARGIN_TONE = { PEPITE: 'text-emerald-600 dark:text-emerald-400', SURVEILLER: 'text-amber-600 dark:text-amber-400', REFUSE: 'text-rose-600 dark:text-rose-400' } as const;
 
 export function ListingCard({
   item,
   mode = 'hunt',
   onMessage,
+  onOutreach,
   onRemove,
 }: {
   item: ScoredListing;
   mode?: 'hunt' | 'mandate';
   onMessage: (item: ScoredListing, kind: MessageKind) => void;
+  /** Message autonome via /api/outreach : fiches PÉPITE, et fiches mandat (J+15). */
+  onOutreach?: (item: ScoredListing) => void;
   onRemove?: (id: string) => void;
 }) {
   const { listing, analysis } = item;
   const [open, setOpen] = useState(false);
   const refused = analysis.blacklist.length > 0;
+  const canOutreach = analysis.status.key === 'PEPITE' || (mode === 'mandate' && analysis.mandateEligible);
   const f = analysis.finance;
 
   const meta = [
@@ -79,7 +83,7 @@ export function ListingCard({
           {mode === 'mandate' && analysis.mandate ? (
             <>
               <dt className="text-[11px] uppercase tracking-wide text-ink-400">Revenu mandat</dt>
-              <dd className="tabular text-sm font-bold text-emerald-600">{eur(analysis.mandate.totalRevenue)}</dd>
+              <dd className="tabular text-sm font-bold text-emerald-600 dark:text-emerald-400">{eur(analysis.mandate.totalRevenue)}</dd>
             </>
           ) : (
             <>
@@ -92,10 +96,10 @@ export function ListingCard({
 
       <div className="flex flex-1 flex-col gap-2.5 p-4">
         {analysis.blacklist.map((b) => (
-          <div key={b.id} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+          <div key={b.id} className="rounded-lg border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3 py-2 text-xs text-rose-800 dark:text-rose-300">
             <p className="font-semibold">⛔ {b.label}</p>
-            <p className="mt-0.5 text-rose-700">{b.reason}</p>
-            {b.evidence && <p className="mt-1 font-mono text-[11px] text-rose-600">« {b.evidence} »</p>}
+            <p className="mt-0.5 text-rose-700 dark:text-rose-300">{b.reason}</p>
+            {b.evidence && <p className="mt-1 font-mono text-[11px] text-rose-600 dark:text-rose-400">« {b.evidence} »</p>}
           </div>
         ))}
 
@@ -115,7 +119,7 @@ export function ListingCard({
         )}
 
         {analysis.warnings.length > 0 && (
-          <ul className="space-y-1 text-xs text-amber-800">
+          <ul className="space-y-1 text-xs text-amber-800 dark:text-amber-300">
             {analysis.warnings.map((w) => (
               <li key={w} className="flex gap-1.5">
                 <span aria-hidden>⚠</span>
@@ -142,25 +146,28 @@ export function ListingCard({
           </div>
         )}
 
-        <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
-          <button type="button" className="btn-ghost px-2 text-xs" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-            {open ? 'Masquer le détail' : mode === 'mandate' ? 'Détail du mandat' : 'Détail du calcul'}
-          </button>
-          <div className="ml-auto flex gap-2">
-            {!refused && mode === 'hunt' && (
-              <button type="button" className="btn-secondary text-xs" onClick={() => onMessage(item, 'negotiation')}>
-                Script de négo
-              </button>
-            )}
-            {analysis.mandateEligible && (
-              <button
-                type="button"
-                className={cn('text-xs', mode === 'mandate' ? 'btn-primary' : 'btn-secondary')}
-                onClick={() => onMessage(item, 'mandate')}
-              >
-                Proposer un mandat
-              </button>
-            )}
+        <div className="mt-auto space-y-2 pt-1">
+          {canOutreach && onOutreach && (
+            <button type="button" className="btn-primary w-full" onClick={() => onOutreach(item)}>
+              ⚡ Générer le message autonome
+            </button>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="btn-ghost px-2 text-xs" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+              {open ? 'Masquer le détail' : mode === 'mandate' ? 'Détail du mandat' : 'Détail du calcul'}
+            </button>
+            <div className="ml-auto flex gap-2">
+              {!refused && mode === 'hunt' && (
+                <button type="button" className="btn-secondary text-xs" onClick={() => onMessage(item, 'negotiation')}>
+                  Script de négo
+                </button>
+              )}
+              {analysis.mandateEligible && (
+                <button type="button" className="btn-secondary text-xs" onClick={() => onMessage(item, 'mandate')}>
+                  Proposer un mandat
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
