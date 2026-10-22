@@ -22,6 +22,8 @@ export interface StoredRun {
 
 const RUNS_PREFIX = 'radar/runs/';
 const ALERTS_PREFIX = 'radar/alerts/';
+const BATCHES_PREFIX = 'radar/batches/';
+const CLAIMS_PREFIX = 'radar/claims/';
 
 export const storeEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
@@ -29,6 +31,16 @@ async function readJson<T>(pathname: string): Promise<T | null> {
   const result = await get(pathname, { access: 'private', useCache: false });
   if (!result || result.statusCode !== 200) return null;
   return (await new Response(result.stream).json()) as T;
+}
+
+async function exists(pathname: string) {
+  try {
+    await head(pathname);
+    return true;
+  } catch (error) {
+    if (error instanceof BlobNotFoundError) return false;
+    throw error;
+  }
 }
 
 async function writeJson(pathname: string, data: unknown, overwrite = false) {
@@ -76,13 +88,38 @@ export async function pruneRuns(days: number) {
 
 /** true si l'alerte a déjà été envoyée. */
 export async function alertAlreadySent(key: string) {
+  return exists(`${ALERTS_PREFIX}${key}.json`);
+}
+
+/** Lot de recherches du jour : liste ordonnée des sources à lancer, dans la limite de concurrence Apify. */
+export async function saveBatch(batchId: string, keys: string[]) {
+  await writeJson(`${BATCHES_PREFIX}${batchId}.json`, { batchId, keys, createdAt: new Date().toISOString() }, true);
+}
+
+export async function loadBatch(batchId: string) {
+  return readJson<{ batchId: string; keys: string[] }>(`${BATCHES_PREFIX}${batchId}.json`);
+}
+
+const claimPath = (batchId: string, key: string) => `${CLAIMS_PREFIX}${batchId}/${key}.json`;
+
+/**
+ * Réserve une source d'un lot (verrou) : la création sans écrasement échoue si le fichier existe,
+ * donc deux webhooks simultanés ne peuvent pas lancer la même recherche.
+ * @returns true si la réservation est obtenue
+ */
+export async function claimSource(batchId: string, key: string) {
   try {
-    await head(`${ALERTS_PREFIX}${key}.json`);
+    await writeJson(claimPath(batchId, key), { claimedAt: new Date().toISOString() });
     return true;
   } catch (error) {
-    if (error instanceof BlobNotFoundError) return false;
+    if (await exists(claimPath(batchId, key))) return false;
     throw error;
   }
+}
+
+/** Libère une réservation (lancement refusé par Apify, à retenter plus tard). */
+export async function releaseSource(batchId: string, key: string) {
+  await del(claimPath(batchId, key)).catch(() => undefined);
 }
 
 export async function markAlertSent(key: string, data: unknown) {

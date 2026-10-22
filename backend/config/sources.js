@@ -29,6 +29,8 @@ export const HUNT_LIMITS = {
   marketMaxItems: 30,
   /** Plafond de dépense Apify par run (USD), transmis à Apify. */
   maxChargeUsd: 1,
+  /** Runs Apify simultanés : le plan gratuit en autorise 5, on en garde 1 de marge. */
+  maxConcurrent: 4,
   /** Jour de la semaine (0 = dimanche) des recherches hebdomadaires (stale + comparables). */
   marketWeekday: 1,
   /** Durée de conservation des runs en stock (jours). */

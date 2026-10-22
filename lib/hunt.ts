@@ -1,13 +1,15 @@
 import 'server-only';
 
-import { getDatasetItems, getRun, startRun } from '@/backend/pipeline/apify.js';
+import { randomUUID } from 'node:crypto';
+
+import { getDatasetItems, getRun, isCapacityError, startRun } from '@/backend/pipeline/apify.js';
 import { priceListings, selectAlerts } from '@/backend/pipeline/hunt.js';
 import { dedupeById } from '@/backend/pipeline/market.js';
 import { normalizeApifyItem } from '@/backend/pipeline/normalize.js';
 import { formatTelegramAlert, sendTelegram } from '@/backend/pipeline/telegram.js';
 import { HUNT_LIMITS, defaultSources, parseArea, type HuntSource } from '@/backend/config/sources.js';
 
-import { alertAlreadySent, loadRuns, markAlertSent, pruneRuns, saveRun, storeEnabled } from './store';
+import { alertAlreadySent, claimSource, loadBatch, loadRuns, markAlertSent, pruneRuns, releaseSource, saveBatch, saveRun, storeEnabled } from './store';
 import type { Listing } from './types';
 
 /** Configuration lue dans les variables d'environnement Vercel. */
@@ -25,6 +27,8 @@ export function huntConfig() {
     maxItems: Number(env.HUNT_MAX_ITEMS) || HUNT_LIMITS.maxItems,
     marketMaxItems: Number(env.HUNT_MARKET_MAX_ITEMS) || HUNT_LIMITS.marketMaxItems,
     maxChargeUsd: Number(env.APIFY_MAX_CHARGE_USD) || HUNT_LIMITS.maxChargeUsd,
+    /** Runs Apify simultanés (plan gratuit : 5 max, on garde une marge). */
+    maxConcurrent: Number(env.APIFY_MAX_CONCURRENT) || HUNT_LIMITS.maxConcurrent,
     customSources: env.HUNT_SOURCES,
     /** Fourni par Vercel quand "Protection Bypass for Automation" est activé sur le projet. */
     bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET || undefined,
@@ -64,34 +68,73 @@ export function missingConfig(config: Config, needs: ('apify' | 'store' | 'inges
   return missing;
 }
 
-/** Lance les runs Apify du jour (recherches hebdomadaires stale + comparables le jour configuré). */
+/** Lance une source d'un lot ; null si Apify refuse faute de capacité (la source reste à lancer). */
+async function launchSource(config: Config, source: HuntSource, batchId: string) {
+  if (!(await claimSource(batchId, source.key))) return { source: source.key, skipped: 'already_claimed' as const };
+  try {
+    const run = await startRun({
+      token: config.apifyToken,
+      source,
+      webhookUrl: `${config.appUrl}/api/hunt/ingest`,
+      webhookSecret: config.ingestSecret,
+      maxChargeUsd: config.maxChargeUsd,
+      bypassSecret: config.bypassSecret,
+      batchId,
+    });
+    return { source: source.key, ...run };
+  } catch (error) {
+    if (isCapacityError(error)) {
+      await releaseSource(batchId, source.key);
+      return null;
+    }
+    // Erreur définitive (input refusé…) : la réservation est gardée pour ne pas la retenter en boucle.
+    return { source: source.key, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Lance les sources d'un lot dans l'ordre jusqu'à `slots` lancements réussis.
+ * S'arrête au premier refus de capacité : les runs en cours relanceront la suite en se terminant.
+ */
+async function launchFromBatch(config: Config, batchId: string, keys: string[], slots: number) {
+  const byKey = new Map(resolveSources(config, true).map((s) => [s.key, s]));
+  const launched: NonNullable<Awaited<ReturnType<typeof launchSource>>>[] = [];
+  let started = 0;
+  for (const key of keys) {
+    if (started >= slots) break;
+    const source = byKey.get(key);
+    if (!source) continue;
+    const result = await launchSource(config, source, batchId);
+    if (result === null) break;
+    if ('skipped' in result) continue;
+    launched.push(result);
+    if ('runId' in result) started += 1;
+  }
+  return launched;
+}
+
+/** Lance la chasse du jour : un lot ordonné (fresh, puis stale et comparables le jour hebdo), dans la limite de concurrence. */
 export async function startHunt(options: { now?: Date; includeWeekly?: boolean } = {}) {
   const config = huntConfig();
   const now = options.now ?? new Date();
   const includeWeekly = options.includeWeekly ?? now.getUTCDay() === HUNT_LIMITS.marketWeekday;
   const sources = resolveSources(config, includeWeekly);
+  const batchId = `${now.toISOString().slice(0, 10)}-${includeWeekly ? 'w' : 'd'}-${randomUUID().slice(0, 8)}`;
+  const keys = sources.map((s) => s.key);
 
-  const results = await Promise.allSettled(
-    sources.map((source) =>
-      startRun({
-        token: config.apifyToken,
-        source,
-        webhookUrl: `${config.appUrl}/api/hunt/ingest`,
-        webhookSecret: config.ingestSecret,
-        maxChargeUsd: config.maxChargeUsd,
-        bypassSecret: config.bypassSecret,
-      }),
-    ),
-  );
+  await saveBatch(batchId, keys);
+  const runs = await launchFromBatch(config, batchId, keys, config.maxConcurrent);
   const pruned = await pruneRuns(HUNT_LIMITS.retentionDays).catch(() => 0);
+  const startedCount = runs.filter((r) => 'runId' in r).length;
+  return { batchId, includeWeekly, total: keys.length, started: startedCount, queued: keys.length - runs.length, pruned, runs };
+}
 
-  return {
-    includeWeekly,
-    pruned,
-    runs: results.map((r, i) =>
-      r.status === 'fulfilled' ? { source: sources[i].key, ...r.value } : { source: sources[i].key, error: String(r.reason?.message ?? r.reason) },
-    ),
-  };
+/** Appelé à la fin de chaque run : libère un créneau, donc lance la recherche suivante du lot. */
+export async function continueBatch(batchId: string) {
+  if (!/^[A-Za-z0-9-]{1,64}$/.test(batchId)) return [];
+  const batch = await loadBatch(batchId);
+  if (!batch) return [];
+  return launchFromBatch(huntConfig(), batchId, batch.keys, 1);
 }
 
 /** Traite un run Apify terminé : stockage, cote, scoring, alertes Telegram. */
