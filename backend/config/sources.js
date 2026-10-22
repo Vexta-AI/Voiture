@@ -7,8 +7,7 @@
  *   - market : recherches larges par modèle, chaque semaine, sans alerte, pour la cote (médiane des comparables)
  *
  * Les recherches fresh/stale passent par une URL LeBonCoin (le scraper l'accepte telle quelle).
- * Pour cibler précisément ta zone : fais la recherche sur leboncoin.fr, copie l'URL, et colle-la
- * dans la variable HUNT_SOURCES (JSON, voir README). Rien à recoder.
+ * La zone prioritaire passe par le paramètre "locations" (centre GPS + rayon) : voir lbcLocation.
  */
 
 import { AUTO_TARGETS, BUDGETS, MOTO_TARGETS } from './rules.js';
@@ -19,6 +18,9 @@ export const APIFY_ACTOR_ID = 'bovi~leboncoin-listings';
 export const LBC_CATEGORY = { auto: '2', moto: '3' };
 
 /** Zone par défaut : 200 km autour du point fourni (Gironde), comme l'URL LeBonCoin lat/lng/radius. */
+/** Libellé de ville exigé par le format de zone LeBonCoin (la recherche se fait sur les coordonnées). */
+const LBC_AREA_LABEL = 'Bordeaux_33000';
+
 export const DEFAULT_AREA = { lat: 44.90100112020876, lng: -0.7400689834642227, radiusKm: 200 };
 
 /** Garde-fous de coût, réglables par variables d'environnement. */
@@ -76,11 +78,20 @@ const MARKET_QUERIES = {
   },
 };
 
+/**
+ * Zone au format de l'URL LeBonCoin : "<Ville>_<CP>__<lat>_<lng>_<rayon ville m>_<rayon m>".
+ * Seul format respecté par le scraper (test du 22/10 : lat/lng/radius ou un nom de ville seul
+ * sont ignorés ou ne renvoient rien ; celui-ci renvoie 100 % d'annonces dans la zone).
+ */
+function lbcLocation(area) {
+  return `${LBC_AREA_LABEL}__${area.lat}_${area.lng}_9256_${Math.round(area.radiusKm * 1000)}`;
+}
+
 function lbcSearchUrl({ type, area, order }) {
   const { min, max } = BUDGETS[type];
   const params = new URLSearchParams({
     category: LBC_CATEGORY[type],
-    ...(area ? { lat: String(area.lat), lng: String(area.lng), radius: String(Math.round(area.radiusKm * 1000)) } : {}),
+    ...(area ? { locations: lbcLocation(area) } : {}),
     price: `${min}-${max}`,
     sort: 'time',
     order,
