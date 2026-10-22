@@ -7,7 +7,7 @@ import { priceListings, selectAlerts } from '@/backend/pipeline/hunt.js';
 import { dedupeById } from '@/backend/pipeline/market.js';
 import { normalizeApifyItem } from '@/backend/pipeline/normalize.js';
 import { formatTelegramAlert, sendTelegram } from '@/backend/pipeline/telegram.js';
-import { HUNT_LIMITS, defaultSources, parseArea, type HuntSource } from '@/backend/config/sources.js';
+import { HUNT_LIMITS, defaultSources, parseArea, parseTypes, type HuntSource } from '@/backend/config/sources.js';
 
 import { alertAlreadySent, claimSource, loadBatch, loadRuns, markAlertSent, pruneRuns, releaseSource, saveBatch, saveRun, storeEnabled } from './store';
 import type { Listing } from './types';
@@ -24,6 +24,8 @@ export function huntConfig() {
     appUrl: host.replace(/\/$/, ''),
     /** "lat,lng,rayonKm" — défaut : 200 km autour de la Gironde. */
     area: parseArea(env.HUNT_AREA) ?? undefined,
+    /** "auto" pour ne chasser que les voitures (ex. en hiver), défaut : auto + moto. */
+    types: parseTypes(env.HUNT_TYPES) ?? undefined,
     maxItems: Number(env.HUNT_MAX_ITEMS) || HUNT_LIMITS.maxItems,
     marketMaxItems: Number(env.HUNT_MARKET_MAX_ITEMS) || HUNT_LIMITS.marketMaxItems,
     maxChargeUsd: Number(env.APIFY_MAX_CHARGE_USD) || HUNT_LIMITS.maxChargeUsd,
@@ -39,7 +41,7 @@ type Config = ReturnType<typeof huntConfig>;
 
 /** Sources actives : HUNT_SOURCES (JSON) remplace les recherches fresh/stale par défaut. */
 export function resolveSources(config: Config, includeWeekly: boolean): HuntSource[] {
-  const defaults = defaultSources({ area: config.area, maxItems: config.maxItems, marketMaxItems: config.marketMaxItems, includeWeekly });
+  const defaults = defaultSources({ area: config.area, maxItems: config.maxItems, marketMaxItems: config.marketMaxItems, includeWeekly, types: config.types });
   if (!config.customSources) return defaults;
   let custom: unknown;
   try {
