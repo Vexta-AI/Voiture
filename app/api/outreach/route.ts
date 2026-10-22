@@ -1,9 +1,8 @@
-import { timingSafeEqual } from 'node:crypto';
-
 import { NextResponse } from 'next/server';
 
 import { buildOutreachPayload } from '@/backend/utils/outreach.js';
 import { scoreListing } from '@/backend/utils/scoring.js';
+import { secretMatches } from '@/lib/auth';
 import { validateListing } from '@/lib/validate';
 
 export const runtime = 'nodejs';
@@ -56,12 +55,7 @@ export async function POST(request: Request) {
 }
 
 function isAuthorized(request: Request) {
-  const expected = process.env.OUTREACH_API_KEY;
-  const provided = request.headers.get('x-api-key');
-  if (!expected || !provided) return false;
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
+  return secretMatches(request.headers.get('x-api-key'), process.env.OUTREACH_API_KEY);
 }
 
 async function dispatchToMake(payload: unknown) {

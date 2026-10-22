@@ -17,6 +17,11 @@ Déploiement Vercel : importer le repo, aucun réglage requis. Variables optionn
 
 | Variable | Rôle |
 |---|---|
+| `APIFY_TOKEN` | token Apify : collecte des annonces LeBonCoin |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | alertes PÉPITE / Mandat avec message prêt à copier |
+| `CRON_SECRET` / `INGEST_SECRET` | secrets du cron et du webhook Apify (générés à la création du projet) |
+| `BLOB_READ_WRITE_TOKEN` | stockage Vercel Blob (posé par l'intégration Blob) |
+| `HUNT_LOCATION`, `HUNT_MAX_ITEMS`, `APIFY_MAX_CHARGE_USD`, `HUNT_SOURCES` | réglages de la chasse (optionnels) |
 | `ANTHROPIC_API_KEY` | active « Affiner avec l'IA » dans l'éditeur de messages |
 | `OUTREACH_API_KEY` | clé exigée (en-tête `x-api-key`) pour pousser un payload vers Make |
 | `MAKE_WEBHOOK_URL` | URL du webhook Make.com qui reçoit les payloads `dispatch` |
@@ -31,6 +36,8 @@ backend/
   utils/scoring.js       ← moteur de scoring & calcul de marge (fonction pure)
   utils/messages.js      ← générateur de scripts : négociation & proposition de mandat
   utils/outreach.js      ← choix de stratégie + payload JSON autonome (Make.com)
+  config/sources.js      ← recherches LeBonCoin (fresh / stale / comparables) et garde-fous de coût
+  pipeline/              ← chasse automatique : normalisation Apify, cote par comparables, alertes Telegram
   utils/text.js          ← normalisation du texte, détection de mots-clés avec gestion des négations
   utils/scoring.test.js  ← tests des règles
   data/listings.js       ← annonces de démo (une par règle)
@@ -40,6 +47,8 @@ app/
   api/score              ← POST une annonce ou un tableau → analyse (point d'entrée scraper / n8n)
   api/messages           ← POST génère le script, affinage optionnel par Claude
   api/outreach           ← POST message autonome pour une PÉPITE / un mandat J+15 (Make.com)
+  api/hunt/start         ← GET cron quotidien : lance les recherches Apify
+  api/hunt/ingest        ← POST webhook Apify de fin de run : cote, scoring, alertes
 components/
   dashboard/             ← onglets, KPIs, filtres, règles mandat
   listing/               ← fiche annonce, détail du calcul de marge
@@ -102,6 +111,33 @@ Le bonus des options déclencheurs n'entre **jamais** dans la marge ni dans le s
 ```
 
 Champs moto : `licenseCategory` (`MTT1` / `MTT2`). Tesla : `vin`. PureTech : `beltMonthsAgo` (sinon lu dans le texte).
+
+## Chasse automatique (Vercel + Apify + Telegram)
+
+```
+Cron Vercel (7 h) → /api/hunt/start → runs Apify (LeBonCoin, proxy résidentiel FR, plafond de coût par run)
+Apify (fin de run) → /api/hunt/ingest → relit le run chez Apify → normalise → cote par comparables
+  → scoring → outreach → alerte Telegram (anti-doublon) → stockage Vercel Blob → dashboard en direct
+```
+
+- **Recherches** : `fresh` (dernières annonces de la zone, alertes PÉPITE), `stale` (annonces les plus anciennes, cibles Mandat J+15), `market` (recherches larges par modèle, chaque lundi, pour la cote).
+- **Cote** : médiane des annonces comparables (même modèle, ±1 an et ±35 % de km, puis ±2 ans et ±60 %), 4 comparables minimum, 10 % d'extrêmes retirés au-delà de 10. Pas assez de comparables = pas de cote = pas d'alerte : aucune marge n'est inventée.
+- **Alertes** : 10 max par run, triées par score. Une annonce déjà signalée ne l'est plus, sauf baisse de prix.
+- **Sécurité** : le cron exige `CRON_SECRET`, le webhook exige `INGEST_SECRET`, et seul l'id du run est lu dans le webhook (les annonces sont relues chez Apify avec notre token).
+- **Envoi au vendeur** : manuel, depuis Telegram. LeBonCoin n'a pas d'API de messagerie et bannit les envois automatisés.
+- **Fréquence** : le plan Vercel Hobby limite les crons à 1 par jour. Pour plus de passages, passe en Pro et change `schedule` dans `vercel.json` (ex. `0 6-21/2 * * *`), ou appelle `/api/hunt/start` depuis un planificateur externe avec l'en-tête `Authorization: Bearer <CRON_SECRET>`.
+- **Coût** : environ 400 annonces/jour + ~1 000 comparables/semaine (≈ 16 000 annonces/mois), soit environ 25 à 50 $/mois au tarif affiché du scraper (1,50 à 2,91 $ / 1 000), plus la bande passante du proxy résidentiel. Réduis `HUNT_MAX_ITEMS` pour baisser la facture. Vérifie le prix en vigueur sur la page du scraper `bovi/leboncoin-listings`.
+
+**Tes propres recherches** : fais ta recherche sur leboncoin.fr (zone, prix, tri « plus récentes »), copie l'URL, puis renseigne `HUNT_SOURCES` :
+
+```json
+[
+  { "key": "fresh-auto", "kind": "fresh", "type": "auto", "input": { "searchUrl": "https://www.leboncoin.fr/recherche?category=2&..." } },
+  { "key": "stale-auto", "kind": "stale", "type": "auto", "input": { "searchUrl": "https://www.leboncoin.fr/recherche?category=2&...&order=asc" } }
+]
+```
+
+**Lancement manuel** (ex. pour tester) : `curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/hunt/start` (ajoute `?market=1` pour forcer les comparables, indispensable au tout premier lancement).
 
 ## Outreach autonome (Make.com)
 

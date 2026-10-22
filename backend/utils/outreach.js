@@ -76,7 +76,7 @@ export function buildOutreachPayload(listing, analysis, options = {}) {
         : requested === 'mandate'
           ? 'Mandat impossible : annonce en ligne depuis moins de 15 jours.'
           : `Annonce non PÉPITE (statut ${analysis.status.label}, marge nette ${analysis.finance.netMargin} €).`;
-    return { ok: false, error: 'not_eligible', reason, status: analysis.status.key, eligibleStrategies: strategies };
+    return { ok: /** @type {const} */ (false), error: /** @type {const} */ ('not_eligible'), reason, status: analysis.status.key, eligibleStrategies: strategies };
   }
 
   const strategy = requested === 'auto' ? strategies[0] : requested;
@@ -85,7 +85,7 @@ export function buildOutreachPayload(listing, analysis, options = {}) {
   const m = analysis.mandate;
 
   return {
-    ok: true,
+    ok: /** @type {const} */ (true),
     event: 'outreach.generated',
     version: OUTREACH_VERSION,
     generatedAt: (options.now ?? new Date()).toISOString(),

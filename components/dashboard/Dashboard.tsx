@@ -18,6 +18,10 @@ import { TabNav } from './TabNav';
 
 const STORAGE_KEY = 'pepite-radar:user-listings';
 
+export type RadarInfo =
+  | { mode: 'live'; lastRun: string | null; poolSize: number; unpriced: number }
+  | { mode: 'demo'; configured: boolean };
+
 const TABS: { key: TabKey; label: string; hint: string }[] = [
   { key: 'auto', label: BUDGETS.auto.label, hint: 'Citadines / compactes (Clio 4/5, Polo, Golf, 208) & Tesla Shanghai' },
   { key: 'moto', label: BUDGETS.moto.label, hint: 'Roadsters A2 & gros trails (BMW GS, MT-07, Z900)' },
@@ -32,7 +36,7 @@ const SORTERS: Record<SortKey, (a: ScoredListing, b: ScoredListing) => number> =
   mandate: (a, b) => (b.analysis.mandate?.totalRevenue ?? 0) - (a.analysis.mandate?.totalRevenue ?? 0),
 };
 
-export function Dashboard({ initialListings }: { initialListings: Listing[] }) {
+export function Dashboard({ initialListings, radar }: { initialListings: Listing[]; radar: RadarInfo }) {
   const [tab, setTab] = useState<TabKey>('auto');
   const [userListings, setUserListings] = useState<Listing[]>([]);
   const [targets, setTargets] = useState<Record<'auto' | 'moto', string[]>>({
@@ -138,6 +142,7 @@ export function Dashboard({ initialListings }: { initialListings: Listing[] }) {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
+        <RadarBanner radar={radar} />
         <p className="text-sm text-ink-500">{activeTab.hint}</p>
 
         <KpiBar tab={tab} items={scope} />
@@ -197,6 +202,28 @@ export function Dashboard({ initialListings }: { initialListings: Listing[] }) {
       <MessageModal item={message?.item ?? null} kind={message?.kind ?? 'negotiation'} aiEnabled={aiEnabled} onClose={() => setMessage(null)} />
       <OutreachModal item={outreach} onClose={() => setOutreach(null)} />
       <AnalyzerDrawer open={analyzerOpen} onClose={() => setAnalyzerOpen(false)} onAdd={(l) => persist([l, ...userListings])} />
+    </div>
+  );
+}
+
+function RadarBanner({ radar }: { radar: RadarInfo }) {
+  if (radar.mode === 'live') {
+    const last = radar.lastRun ? new Date(radar.lastRun).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+        <span className="font-semibold">● Radar en direct (LeBonCoin)</span>
+        <span>Dernière collecte : {last}</span>
+        <span>{radar.poolSize} annonces en base de comparables</span>
+        {radar.unpriced > 0 && <span className="text-ink-500">{radar.unpriced} récentes sans cote (pas assez de comparables)</span>}
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-ink-200 bg-surface px-3 py-2 text-xs text-ink-600">
+      <span className="font-semibold text-ink-800">Mode démo</span> — annonces fictives.{' '}
+      {radar.configured
+        ? 'Le radar est branché : les vraies annonces apparaîtront après la première collecte.'
+        : 'Branche Apify, Vercel Blob et Telegram pour passer en réel (voir README).'}
     </div>
   );
 }
