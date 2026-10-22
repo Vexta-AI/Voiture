@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { cronAuthorized } from '@/lib/auth';
-import { huntConfig, missingConfig, startHunt } from '@/lib/hunt';
+import { huntConfig, missingConfig, sendCrmDigest, startHunt } from '@/lib/hunt';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,9 +23,13 @@ export async function GET(request: Request) {
   const weekly = params.get('weekly') === '1' || params.get('market') === '1';
   try {
     const result = await startHunt({ includeWeekly: weekly ? true : undefined });
+    const digest = await sendCrmDigest().catch((error: unknown) => {
+      console.error('[api/hunt/start] digest', error);
+      return { sent: false };
+    });
     // Les sources non lancées restent en file : chaque run terminé lance la suivante (limite de concurrence Apify).
     const ok = result.started > 0;
-    return NextResponse.json({ ok, ...result }, { status: ok ? 200 : 502 });
+    return NextResponse.json({ ok, ...result, digest }, { status: ok ? 200 : 502 });
   } catch (error) {
     console.error('[api/hunt/start]', error);
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'start_failed' }, { status: 500 });

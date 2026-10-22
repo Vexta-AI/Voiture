@@ -8,6 +8,7 @@
  *   4. Formule financière :
  *        Marge Brute  = Cote Marché Pro (+ bonus options) - Prix Affiché
  *        Marge Nette  = Marge Brute - 350 € (remise en état) - 200 € (capital risque)
+ *        Marge réelle = Marge Nette - rapatriement (hors zone) - carte grise (achat en particulier)
  *   5. Statut : 🔥 PÉPITE POTENTIELLE / A SURVEILLER / REFUSE
  *   6. Éligibilité Dépôt-Vente / Mandat (annonce en ligne depuis plus de 14 jours)
  *
@@ -28,12 +29,15 @@ import {
   MOTO_TARGETS,
   NEGOTIATION_LEVERS,
   PRICE_BANDS,
+  REGISTRATION,
+  RURAL,
   SEASONALITY,
   SEGMENTS,
   SEGMENT_RULES,
   TESLA_RULES,
   VALUE_TRIGGERS,
 } from '../config/rules.js';
+import { distanceKm as gpsDistanceKm } from '../pipeline/geo.js';
 import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplacement } from './text.js';
 
 /**
@@ -54,11 +58,14 @@ import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplaceme
  * @property {string} [description]
  * @property {string[]} [options]
  * @property {number} [doors]
+ * @property {number} [fiscalHp]       puissance fiscale (CV), base de la carte grise
  * @property {string} [vin]
  * @property {'MTT1'|'MTT2'} [licenseCategory]  moto : carte grise A2 (MTT1) ou Full (MTT2)
  * @property {number} [beltMonthsAgo] PureTech : ancienneté (mois) de la facture courroie + crépine
  * @property {'citadine'|'compacte'|'suv'|'premium'|'moto'} [segment] force le segment
  * @property {'prioritaire'|'france'} [zone] zone fixée à l'ingestion
+ * @property {number} [lat]
+ * @property {number} [lng]
  * @property {number} [distanceKm]    distance à la base (annonces réelles) : rapatriement au-delà de la zone prioritaire
  * @property {string} publishedAt     ISO date de mise en ligne
  * @property {string} [location]
@@ -347,6 +354,36 @@ export function computeMandate(listing) {
 
 // ---------------------------------------------------------------------------
 // 5. Scoring principal
+/**
+ * Campagne ou ville : distance à la grande ville la plus proche (GPS requis).
+ * @returns {{ type: 'campagne'|'ville'|null, nearestCity: string|null, cityKm: number|null }}
+ */
+export function areaType(listing) {
+  if (typeof listing.lat !== 'number' || typeof listing.lng !== 'number') return { type: null, nearestCity: null, cityKm: null };
+  let best = { name: '', km: Infinity };
+  for (const city of RURAL.cities) {
+    const km = gpsDistanceKm(listing, city);
+    if (km < best.km) best = { name: city.name, km };
+  }
+  return { type: best.km > RURAL.minKm ? 'campagne' : 'ville', nearestCity: best.name, cityKm: Math.round(best.km) };
+}
+
+/**
+ * Coût de la carte grise à l'achat : chevaux fiscaux × tarif régional (÷ 2 au-delà de 10 ans) + frais fixes.
+ * 0 € en statut pro (déclaration d'achat + W garage).
+ * @returns {{ cost: number, cv: number, estimatedCv: boolean, halved: boolean, status: 'particulier'|'pro' }}
+ */
+export function registrationCost(listing, segment, now = new Date()) {
+  const fiscal = Number(listing.fiscalHp);
+  const estimatedCv = !(fiscal >= 1 && fiscal <= 60);
+  const cv = estimatedCv ? REGISTRATION.defaultCv[segment] ?? REGISTRATION.defaultCv.compacte : Math.round(fiscal);
+  // Seule l'année est connue : demi-tarif seulement quand les 10 ans sont dépassés à coup sûr.
+  const halved = now.getFullYear() - Number(listing.year) > REGISTRATION.oldVehicleYears;
+  if (REGISTRATION.status === 'pro') return { cost: 0, cv, estimatedCv, halved, status: REGISTRATION.status };
+  const regional = cv * REGISTRATION.pricePerCv * (halved ? REGISTRATION.oldVehicleDiscount : 1);
+  return { cost: Math.round(regional + REGISTRATION.fixedFees), cv, estimatedCv, halved, status: REGISTRATION.status };
+}
+
 // ---------------------------------------------------------------------------
 
 /**
@@ -378,17 +415,23 @@ export function scoreListing(listing, options = {}) {
   /** Valeur perçue avec options déclencheurs (argument de revente, hors statut). */
   const resaleValue = marketPrice + triggersBonus;
   const netMarginWithOptions = netMargin + triggersBonus;
-  // Achat à distance : le rapatriement est déduit avant de parler de pépite.
+  // Achat à distance : le rapatriement est déduit avant de parler de pépite, comme la carte grise.
   const geo = logistics(listing);
-  const netMarginAfterTransport = netMargin - geo.transportCost;
+  const registration = registrationCost(listing, segment, now);
+  const registrationFee = registration.cost;
+  const purchaseCosts = geo.transportCost + registrationFee;
+  /** Ce qui reste vraiment dans la poche : la base du statut PÉPITE. */
+  const realNetMargin = netMargin - purchaseCosts;
 
   // --- Scénario négocié (leviers + coût réel des défauts) ---
   const leversTotal = levers.reduce((sum, l) => sum + l.discount, 0);
   const leversRealCost = levers.reduce((sum, l) => sum + l.realCost, 0);
   const targetPrice = Math.max(0, askingPrice - leversTotal);
-  const negotiatedNetMargin = marketPrice - targetPrice - fixedCosts - leversRealCost - geo.transportCost;
-  /** Prix d'achat maximum pour atteindre le seuil PÉPITE (marge nette strictement supérieure au seuil). */
-  const maxBuyPriceForPepite = marketPrice - fixedCosts - threshold - 1 - geo.transportCost;
+  const negotiatedNetMargin = marketPrice - targetPrice - fixedCosts - leversRealCost - purchaseCosts;
+  /** Prix d'achat maximum pour atteindre le seuil PÉPITE (marge réelle strictement supérieure au seuil). */
+  const maxBuyPriceForPepite = marketPrice - fixedCosts - threshold - 1 - purchaseCosts;
+  /** Prix au-delà duquel l'opération ne rapporte plus rien : on ne monte jamais au-dessus. */
+  const walkAwayPrice = marketPrice - fixedCosts - purchaseCosts;
 
   // --- Contexte marché ---
   const inBudget = askingPrice >= budget.min && askingPrice <= budget.max;
@@ -417,6 +460,15 @@ export function scoreListing(listing, options = {}) {
   if (geo.zone === 'france') {
     warnings.push(`Achat à distance (${geo.distanceKm} km) : rapatriement ≈ ${geo.transportCost.toLocaleString('fr-FR')} € déduit de la marge. Mandat impossible.`);
   }
+  const area = areaType(listing);
+  if (area.type === 'campagne') {
+    insights.push(`🌾 Annonce de campagne (${area.cityKm} km de ${area.nearestCity}) : moins de concurrence d'acheteurs, prix souvent plus bas. Achète ici, revends à Bordeaux.`);
+  }
+  if (registrationFee > 0) {
+    insights.push(
+      `Carte grise à ton nom ≈ ${registrationFee} € (${registration.cv} CV${registration.estimatedCv ? ' estimés' : ''}${registration.halved ? ', -50 % plus de 10 ans' : ''}) déduite de la marge. En pro (W garage) : 0 €.`,
+    );
+  }
   if (online >= MANDATE.minDaysOnline && geo.zone !== 'france') {
     insights.push(`En ligne depuis ${online} jours : vendeur fatigué par les curieux, levier de négo et cible Mandat.`);
   }
@@ -427,23 +479,24 @@ export function scoreListing(listing, options = {}) {
   /** @type {typeof STATUS[keyof typeof STATUS]} */
   let status;
   if (isBlacklisted) status = STATUS.REFUSE;
-  else if (netMarginAfterTransport > threshold && !puretechOverpriced) status = STATUS.PEPITE;
-  else if (netMarginAfterTransport > 0 || negotiatedNetMargin > 0) status = STATUS.SURVEILLER;
+  else if (realNetMargin > threshold && !puretechOverpriced) status = STATUS.PEPITE;
+  else if (realNetMargin > 0 || negotiatedNetMargin > 0) status = STATUS.SURVEILLER;
   else status = STATUS.REFUSE;
 
   // --- Score 0-100 ---
   let score = 0;
   if (!isBlacklisted) {
-    const marginPts = clamp((netMarginAfterTransport / threshold) * 50, 0, 70);
+    const marginPts = clamp((realNetMargin / threshold) * 50, 0, 70);
     const triggerPts = clamp(triggersBonus / 100, 0, 10);
     const leverPts = clamp(leversTotal / 100, 0, 10);
     const agePts = online >= MANDATE.minDaysOnline ? 5 : 0;
+    const ruralPts = area.type === 'campagne' ? RURAL.scoreBonus : 0;
     const liquidityPts = listing.type === 'auto' && segment === 'citadine' && (listing.doors ?? 5) >= 5 ? 5 : listing.type === 'moto' && triggers.some((t) => t.id === MOTO_A2.id) ? 5 : 0;
     // Le rapatriement est déjà déduit de la marge : son avertissement ne pénalise pas deux fois.
     let penalties = (warnings.length - (geo.zone === 'france' ? 1 : 0)) * 5;
     if (puretechOverpriced) penalties += 15;
     if (!inBudget) penalties += 10;
-    score = Math.round(clamp(marginPts + triggerPts + leverPts + agePts + liquidityPts - penalties, 0, 100));
+    score = Math.round(clamp(marginPts + triggerPts + leverPts + agePts + ruralPts + liquidityPts - penalties, 0, 100));
     if (status.key === 'REFUSE') score = Math.min(score, 20);
   }
 
@@ -459,6 +512,9 @@ export function scoreListing(listing, options = {}) {
     priceBand: priceBand(listing),
     zone: geo.zone,
     distanceKm: geo.distanceKm,
+    areaType: area.type,
+    nearestCity: area.nearestCity,
+    cityKm: area.cityKm,
     threshold,
     targets: matchTargets(listing),
     daysOnline: online,
@@ -477,7 +533,9 @@ export function scoreListing(listing, options = {}) {
       grossMargin,
       netMarginWithOptions,
       transportCost: geo.transportCost,
-      netMarginAfterTransport,
+      registrationCost: registrationFee,
+      registration,
+      realNetMargin,
       reconditioning: COSTS.RECONDITIONING_BASE,
       riskCapital: COSTS.RISK_CAPITAL,
       netMargin,
@@ -486,6 +544,7 @@ export function scoreListing(listing, options = {}) {
       targetPrice,
       negotiatedNetMargin,
       maxBuyPriceForPepite,
+      walkAwayPrice,
       targetNetMargin: segmentRule.targetNetMargin,
     },
     mandateEligible,

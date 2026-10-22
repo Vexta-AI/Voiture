@@ -19,7 +19,7 @@ export function formatTelegramAlert(payload, context = {}) {
   const head =
     payload.strategy === 'mandate'
       ? `🤝 <b>MANDAT J+${listing.daysOnline}</b> · revenu ${eur(mandate?.totalRevenue ?? 0)} · 0 € de trésorerie`
-      : `🔥 <b>PÉPITE</b> · marge nette ${eur(scoring.netMargin)} · score ${scoring.score}/100`;
+      : `🔥 <b>PÉPITE</b> · marge réelle ${eur(scoring.realNetMargin)} · score ${scoring.score}/100`;
 
   const lines = [
     head,

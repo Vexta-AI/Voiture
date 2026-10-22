@@ -55,6 +55,7 @@ export function validateListing(input: unknown): Result {
       description: str(o.description),
       options: Array.isArray(o.options) ? o.options.filter((x): x is string => typeof x === 'string') : undefined,
       doors: num(o.doors),
+      fiscalHp: num(o.fiscalHp),
       vin: str(o.vin),
       licenseCategory: license === 'MTT1' || license === 'MTT2' ? license : undefined,
       beltMonthsAgo: num(o.beltMonthsAgo),
@@ -63,6 +64,11 @@ export function validateListing(input: unknown): Result {
       location: str(o.location),
       source: str(o.source),
       url: str(o.url),
+      lat: num(o.lat),
+      lng: num(o.lng),
+      zip: str(o.zip),
+      distanceKm: num(o.distanceKm),
+      zone: o.zone === 'prioritaire' || o.zone === 'france' ? o.zone : undefined,
     },
   };
 }

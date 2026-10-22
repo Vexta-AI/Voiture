@@ -71,12 +71,19 @@ Une seule source de vérité : modifier une valeur dans `backend/config/rules.js
 | Remise en état | − 350 € (detailing 80 € + petite méca) |
 | Capital risque | − 200 € systématiques |
 | **Marge nette** | Marge brute − 550 € |
+| Rapatriement | − 60 € + 0,15 €/km hors zone prioritaire (200 km) |
+| Carte grise | − chevaux fiscaux × 58 € (Nouvelle-Aquitaine, mars 2026), ÷ 2 au-delà de 10 ans, + 13,76 € ; 0 € en pro (`REGISTRATION.status = 'pro'` dans `rules.js`) |
+| **Marge réelle** | Marge nette − rapatriement − carte grise : **base du statut PÉPITE** |
+
+Chevaux fiscaux : lus dans l'annonce (`fiscalHp`), sinon estimés par segment (citadine 5 CV, compacte 6, SUV 7, premium 8, moto 5). Le malus ne s'applique qu'à la première immatriculation en France (import) : jamais à une occasion française.
+
+**Campagne → ville** : une annonce à plus de 30 km de toute grande ville (Bordeaux, Paris, Lyon… et les préfectures de Nouvelle-Aquitaine) reçoit le badge 🌾 Campagne et +5 points de score : moins d'acheteurs sur place, prix plus bas, revente à Bordeaux.
 
 Le bonus des options déclencheurs n'entre **jamais** dans la marge ni dans le statut : il est affiché à part comme « potentiel options » (argument de revente). Un **scénario négocié** est calculé en parallèle : prix cible = prix affiché − leviers de négo, puis déduction du coût réel des défauts.
 
 **Statuts**
 
-- 🔥 **PÉPITE POTENTIELLE** : marge nette > 1 000 € (citadines) ou > 2 000 € (compactes / premium) ; > 1 500 € en moto (paramètre ajustable)
+- 🔥 **PÉPITE POTENTIELLE** : marge réelle > 1 000 € (citadines) ou > 2 000 € (compactes / premium) ; > 1 500 € en moto (paramètre ajustable)
 - **A SURVEILLER** : marge positive au prix affiché ou après négociation
 - **REFUSE** : blacklist, ou aucune marge même négociée
 
@@ -92,7 +99,7 @@ Le bonus des options déclencheurs n'entre **jamais** dans la marge ni dans le s
 - Auto : toit ouvrant / panoramique, Pack AMG, S-Line, M-Sport, volant à méplat, double écran MBUX ; Tesla Shanghai (VIN `LRW`) + LFP + Ryzen
 - Moto : valises alu / top-case BMW ou Givi, ligne Akrapovic, Shifter Pro, Pack Touring / Dynamic, éligibilité A2 (MTT1 ou kit bridage)
 
-**Leviers de négociation** : rayure −300 € (polish 90 €), carrosserie / calandre −500 €, pneus −250 €, plaquettes −150 €, jantes −250 € (rénovation 170 € HT), révision −200 €, kit chaîne moto −200 €. Le script demande une remise bornée entre 500 € et 1 000 €.
+**Leviers de négociation** : rayure −300 € (polish 90 €), carrosserie / calandre −500 €, pneus −250 €, plaquettes −150 €, jantes −250 € (rénovation 170 € HT), révision −200 €, kit chaîne moto −200 €. Le script demande **~10 % du prix** (ou la somme des leviers si elle est plus forte), +5 % quand l'annonce a 15 jours ou plus, entre 800 € et 2 500 € (plafond 15 % du prix sur les petits budgets). Le **prix plafond** (marge réelle à 0) n'est jamais dépassé.
 
 **Mandat J+15** : annonces en ligne depuis plus de 14 jours, hors blacklist. Le propriétaire touche un **prix net garanti** ; la commission est la **plus-value au-dessus de ce prix net** (prix de vente pro = cote − prix net). Si la cote ne laisse pas au moins 500 € de plus-value (paramètre ajustable), le prix net proposé est abaissé d'autant. Upsells : detailing (150 € facturés pour 80 € de coût) et entretien (180 € pour 80 €). Exclusivité 30 jours, dédit de 250 €.
 
@@ -145,6 +152,20 @@ Apify (fin de run) → /api/hunt/ingest → relit le run chez Apify → normalis
 
 **Lancement manuel** (ex. pour tester) : `curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/hunt/start` (ajoute `?weekly=1` pour lancer aussi annonces anciennes + comparables, indispensable au tout premier lancement).
 
+## CRM (`/crm`)
+
+Le radar remplit le CRM tout seul : chaque PÉPITE ou cible mandat alertée devient un **deal** avec son premier message prêt. Le bouton **+ CRM** d'une fiche ajoute une annonce à la main. Tu ne traites que les **leads chauds**.
+
+- **3 pipelines** : achat-revente (À contacter → Contacté → En discussion → Visite → Acheté → Préparation → En vente → Vendu), mandat (… → RDV signature → Mandat signé → En vente → Vendu) et acheteurs (une fiche par acheteur intéressé par un véhicule en vente ; « vendu » sur l'acheteur vend le véhicule).
+- **Lecture des réponses** : colle la réponse du vendeur ou de l'acheteur. Le CRM reconnaît accord, contre-offre (montant extrait et comparé à tes prix max / plafond / plancher), question, refus, « déjà vendu ».
+- **Chaleur 0-100** : étape + intention + fraîcheur de la réponse + « attend ta réponse » + visite imminente. ≥ 70 = 🔥 chaud, en tête de « À traiter ».
+- **Prochaine action + message prêt** : réponse adaptée (accord → visite et virement instantané ; contre-offre jouable → on coupe la poire en deux sans dépasser le plafond ; trop haute → on tient l'offre), relances à J+2 et J+5, clôture proposée après 9 jours de silence, rappel la veille d'une visite, carte grise à faire sous un mois, préparation, annonce de revente rédigée.
+- **Papiers** : check-lists achat (HistoVec, non-gage, CT < 6 mois, carte grise barrée, cession Cerfa 15776, code de cession, carnet, double des clés, immatriculation), mandat et revente.
+- **Argent** : marge attendue, prix d'achat et frais réels, marge encaissée, stock immobilisé, encaissé du mois.
+- **Résumé Telegram** chaque matin avec la chasse : leads chauds, réponses, relances, visites.
+
+Stockage : Vercel Blob (`crm/deals/<id>.json`). API : `GET/POST /api/crm`, `PATCH/DELETE /api/crm/:id` (protégées par le mot de passe du dashboard). L'envoi reste un copier-coller : LeBonCoin n'a pas d'API de messagerie et bannit les envois automatisés.
+
 ## Outreach autonome (Make.com)
 
 `POST /api/outreach` prend une annonce et renvoie un message prêt à envoyer. L'annonce est **toujours re-scorée côté serveur**.
@@ -156,7 +177,7 @@ Apify (fin de run) → /api/hunt/ingest → relit le run chez Apify → normalis
 | `strategy` | Comportement |
 |---|---|
 | `auto` (défaut) | PÉPITE → négociation ; J+15 → mandat ; les deux → la plus rentable (marge négociée vs revenu du mandat, mandat à égalité car zéro trésorerie) |
-| `negotiation` | message de négo : défauts détectés, remise de 500 € à 1 000 €, paiement immédiat par virement instantané |
+| `negotiation` | message de négo : défauts détectés, remise ~10 % (800 € à 2 500 €), paiement immédiat par virement instantané |
 | `mandate` | proposition de dépôt-vente : vente plus chère, zéro curieux, zéro avance, commission sur la plus-value au-dessus du prix net |
 
 Réponse (extrait) :

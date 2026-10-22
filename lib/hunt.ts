@@ -8,8 +8,11 @@ import { filterArea } from '@/backend/pipeline/geo.js';
 import { dedupeById } from '@/backend/pipeline/market.js';
 import { normalizeApifyItem } from '@/backend/pipeline/normalize.js';
 import { formatTelegramAlert, sendTelegram } from '@/backend/pipeline/telegram.js';
+import { dailyDigest } from '@/backend/utils/crm.js';
 import { DEFAULT_AREA, HUNT_LIMITS, defaultSources, parseArea, parseTypes, type HuntSource } from '@/backend/config/sources.js';
 
+import { dealFromListing } from './crm-deals';
+import { createDealOnce, loadDeals } from './crm-store';
 import { alertAlreadySent, claimSource, loadBatch, loadRuns, markAlertSent, pruneRuns, releaseSource, saveBatch, saveRun, storeEnabled } from './store';
 import type { Listing } from './types';
 
@@ -161,7 +164,7 @@ export async function ingestRun(runId: string, sourceKey: string) {
   const fetchedAt = new Date().toISOString();
   await saveRun({ runId, source: source.key, kind: source.kind, type: source.type, fetchedAt, listings, rejected });
 
-  const summary = { ok: true as const, source: source.key, kind: source.kind, items: items.length, listings: listings.length, rejected, priced: 0, unpriced: 0, alerts: 0, skippedDuplicates: 0, alertErrors: 0 };
+  const summary = { ok: true as const, source: source.key, kind: source.kind, items: items.length, listings: listings.length, rejected, priced: 0, unpriced: 0, alerts: 0, skippedDuplicates: 0, alertErrors: 0, crmCreated: 0 };
   if (source.kind === 'market') return summary;
 
   // Le scraper n'applique pas toujours le rayon : seules les annonces vérifiées dans la zone sont chassées
@@ -174,10 +177,16 @@ export async function ingestRun(runId: string, sourceKey: string) {
   summary.priced = priced.length;
   summary.unpriced = unpriced;
 
-  if (!config.telegramToken || !config.telegramChatId) return summary;
-
   for (const alert of selectAlerts(priced)) {
     if (!alert.payload.ok) continue;
+    // CRM : chaque pépite / cible mandat entre dans le pipeline avec son premier message prêt.
+    try {
+      const kind = alert.payload.strategy === 'mandate' ? 'mandat' : 'achat';
+      if (await createDealOnce(dealFromListing(kind, alert.listing as Listing, 'radar'))) summary.crmCreated += 1;
+    } catch (error) {
+      console.error('[hunt] crm', error);
+    }
+    if (!config.telegramToken || !config.telegramChatId) continue;
     if (await alertAlreadySent(alert.key)) {
       summary.skippedDuplicates += 1;
       continue;
@@ -223,4 +232,14 @@ export async function loadLiveRadar() {
     console.error('[hunt] live radar', error);
     return null;
   }
+}
+
+/** Résumé CRM du matin sur Telegram (leads chauds, réponses, relances, visites) ; rien si rien à faire. */
+export async function sendCrmDigest() {
+  const config = huntConfig();
+  if (!config.telegramToken || !config.telegramChatId || !storeEnabled()) return { sent: false };
+  const text = dailyDigest(await loadDeals(), { appUrl: config.appUrl || undefined });
+  if (!text) return { sent: false };
+  await sendTelegram({ token: config.telegramToken, chatId: config.telegramChatId, text });
+  return { sent: true };
 }

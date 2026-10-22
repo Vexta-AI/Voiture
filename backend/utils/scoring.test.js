@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { SAMPLE_LISTINGS } from '../data/listings.js';
-import { generateMandateMessage, generateNegotiationMessage, negotiationDiscount } from './messages.js';
+import { generateMandateMessage, generateNegotiationMessage, negotiationBounds, negotiationDiscount } from './messages.js';
 import { buildOutreachPayload, eligibleStrategies } from './outreach.js';
-import { classifySegment, priceBand, scoreListing } from './scoring.js';
+import { REGISTRATION } from '../config/rules.js';
+import { classifySegment, priceBand, registrationCost, scoreListing } from './scoring.js';
 
 const NOW = new Date('2026-10-22T12:00:00Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -56,20 +57,51 @@ describe('Formule financière', () => {
   it('calcule le scénario négocié avec le coût réel des défauts', () => {
     const a = score({ description: 'Petite rayure sur la portière.' });
     assert.equal(a.finance.targetPrice, 6000 - 300);
-    assert.equal(a.finance.negotiatedNetMargin, 7000 - 5700 - 550 - 90);
+    assert.equal(a.finance.negotiatedNetMargin, 7000 - 5700 - 550 - 90 - 304);
+  });
+
+  it('déduit la carte grise de la marge réelle (5 CV × 58 € + 13,76 €)', () => {
+    const a = score({ price: 6000, marketPrice: 8000 });
+    assert.equal(a.finance.registrationCost, 304);
+    assert.equal(a.finance.realNetMargin, a.finance.netMargin - 304);
+    assert.equal(a.finance.walkAwayPrice, 8000 - 550 - 304);
+  });
+});
+
+describe('Carte grise', () => {
+  it('chevaux fiscaux de l’annonce, sinon estimation par segment', () => {
+    assert.deepEqual(registrationCost(base({ fiscalHp: 7 }), 'citadine', NOW), { cost: 420, cv: 7, estimatedCv: false, halved: false, status: 'particulier' });
+    assert.equal(registrationCost(base(), 'compacte', NOW).cost, 362);
+  });
+
+  it('demi-tarif au-delà de 10 ans', () => {
+    const old = registrationCost(base({ year: 2012 }), 'citadine', NOW);
+    assert.equal(old.halved, true);
+    assert.equal(old.cost, 159);
+    assert.equal(registrationCost(base({ year: 2016 }), 'citadine', NOW).halved, false, '10 ans pas forcément atteints');
+  });
+
+  it('0 € en statut pro (déclaration d’achat + W garage)', () => {
+    REGISTRATION.status = 'pro';
+    try {
+      assert.equal(registrationCost(base(), 'citadine', NOW).cost, 0);
+      assert.equal(score({}).finance.realNetMargin, score({}).finance.netMargin);
+    } finally {
+      REGISTRATION.status = 'particulier';
+    }
   });
 });
 
 describe('Statuts', () => {
-  it('citadine : PÉPITE au-delà de 1 000 € de marge nette', () => {
-    assert.equal(score({ marketPrice: 7551 }).status.key, 'PEPITE'); // net 1001
-    assert.equal(score({ marketPrice: 7550 }).status.key, 'SURVEILLER'); // net 1000
+  it('citadine : PÉPITE au-delà de 1 000 € de marge réelle', () => {
+    assert.equal(score({ marketPrice: 7855 }).status.key, 'PEPITE'); // 1305 - 304 de carte grise = 1001
+    assert.equal(score({ marketPrice: 7854 }).status.key, 'SURVEILLER'); // 1000
   });
 
   it('compacte/premium : PÉPITE au-delà de 2 000 €', () => {
     const golf = { brand: 'Volkswagen', model: 'Golf 7', engine: '1.6 TDI 115' };
     assert.equal(score({ ...golf, price: 10000, marketPrice: 12000 }).status.key, 'SURVEILLER'); // net 1450
-    assert.equal(score({ ...golf, price: 10000, marketPrice: 12600 }).status.key, 'PEPITE'); // net 2050
+    assert.equal(score({ ...golf, price: 10000, marketPrice: 13000 }).status.key, 'PEPITE'); // net 2450 - 362 = 2088
   });
 
   it('REFUSE quand aucune marge, même négociée', () => {
@@ -205,9 +237,14 @@ describe('Segments & Mandat', () => {
 });
 
 describe('Messages', () => {
-  it('borne la remise de négociation entre 500 € et 1 000 €', () => {
-    assert.equal(negotiationDiscount(score({ description: 'Très bon état.' })), 500);
-    assert.equal(negotiationDiscount(score({ description: 'Rayure, pneus à prévoir, plaquettes à prévoir, jantes rayées, bosse.' })), 1000);
+  it('vise ~10 % du prix, entre 800 € et 2 500 €, +5 % à J+15', () => {
+    assert.equal(negotiationDiscount(score({ price: 6000, description: 'Très bon état.' })), 800, 'plancher 800 €');
+    assert.equal(negotiationDiscount(score({ price: 12000, marketPrice: 15000 })), 1200, '10 %');
+    assert.equal(negotiationDiscount(score({ price: 25000, marketPrice: 30000 })), 2500, 'plafond 2 500 €');
+    const stale = new Date(NOW.getTime() - 20 * DAY_MS).toISOString();
+    assert.equal(negotiationDiscount(score({ price: 12000, marketPrice: 15000, publishedAt: stale })), 1800, '10 % + 5 %');
+    assert.equal(negotiationDiscount(score({ description: 'Rayure, pneus à prévoir, plaquettes à prévoir, jantes rayées, bosse.' })), 900, 'leviers plafonnés à 15 %');
+    assert.deepEqual(negotiationBounds(3000), { low: 600, high: 600 }, 'petits prix : crédible');
   });
 
   it('génère des messages exploitables sur toute la démo', () => {
@@ -216,7 +253,9 @@ describe('Messages', () => {
       const nego = generateNegotiationMessage(listing, a);
       assert.ok(nego.offer < listing.price && nego.text.includes('€'));
       assert.equal(nego.discount, listing.price - nego.offer, 'remise rapportée = écart réel');
-      if (!a.puretechCondition) assert.ok(nego.discount >= 500 && nego.discount <= 1000, `${listing.id} : ${nego.discount}`);
+      const { low, high } = negotiationBounds(listing.price);
+      // Arrondi de l'offre au palier de 50 € : la remise peut tomber jusqu'à 50 € sous le plancher.
+      if (!a.puretechCondition) assert.ok(nego.discount > low - 50 && nego.discount <= high, `${listing.id} : ${nego.discount}`);
       if (a.mandateEligible) assert.ok(generateMandateMessage(listing, a).text.includes('dépôt-vente'));
     }
   });
@@ -225,7 +264,7 @@ describe('Messages', () => {
 describe('Outreach autonome', () => {
   const old = new Date(NOW.getTime() - 20 * DAY_MS).toISOString();
 
-  it('PÉPITE récente : négociation, offre 500-1 000 € sous le prix, virement instantané', () => {
+  it('PÉPITE récente : négociation, offre ~10 % sous le prix, virement instantané', () => {
     const listing = base({ price: 6000, marketPrice: 8000, description: 'Rayure sur l’aile, pneus à prévoir.' });
     const payload = buildOutreachPayload(listing, scoreListing(listing, { now: NOW }), { now: NOW });
     assert.equal(payload.ok, true);
@@ -233,7 +272,7 @@ describe('Outreach autonome', () => {
     assert.equal(payload.strategy, 'negotiation');
     assert.ok(payload.negotiation);
     const discount = listing.price - payload.negotiation.offerPrice;
-    assert.ok(discount >= 500 && discount <= 1000, String(discount));
+    assert.ok(discount >= 800 && discount <= 900, String(discount));
     assert.equal(payload.negotiation.payment, 'virement_instantane');
     assert.match(payload.message.body, /virement instantané/);
     assert.match(payload.message.body, /Rayure/);
@@ -287,5 +326,17 @@ describe('Outreach autonome', () => {
         assert.ok(payload.message.subject && payload.message.body.length > 100);
       }
     }
+  });
+});
+
+describe('Campagne / ville', () => {
+  it('campagne à plus de 30 km de toute grande ville, bonus de score', () => {
+    const city = score({ lat: 44.84, lng: -0.58, marketPrice: 8000 }); // Bordeaux
+    const rural = score({ lat: 44.43, lng: -0.21, marketPrice: 8000 }); // Bazas
+    assert.equal(city.areaType, 'ville');
+    assert.equal(rural.areaType, 'campagne');
+    assert.equal(rural.nearestCity, 'Bordeaux');
+    assert.ok(rural.score > city.score);
+    assert.equal(score({}).areaType, null, 'sans GPS : inconnu');
   });
 });

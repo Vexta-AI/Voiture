@@ -143,19 +143,20 @@ describe('Zone & variantes (bugs vus en production)', () => {
 describe('Achat à distance', () => {
   it('déduit le rapatriement : une pépite à 500 km peut redevenir "à surveiller"', () => {
     const base = { ad_id: 8, price: 6990 };
-    const near = { ...listing(base), marketPrice: 8800, zone: 'prioritaire', distanceKm: 40 };
-    const far = { ...listing(base), marketPrice: 8800, zone: 'france', distanceKm: 500 };
+    // Carte grise Clio 2017 : 304 € (5 CV × 58 € + 13,76 €).
+    const near = { ...listing(base), marketPrice: 9104, zone: 'prioritaire', distanceKm: 40 };
+    const far = { ...listing(base), marketPrice: 9104, zone: 'france', distanceKm: 500 };
     const a = scoreListing(near, { now: NOW });
     const b = scoreListing(far, { now: NOW });
     assert.equal(a.finance.transportCost, 0);
-    assert.equal(a.status.key, 'PEPITE'); // 8800 - 6990 - 550 = 1260 > 1000
+    assert.equal(a.status.key, 'PEPITE'); // 9104 - 6990 - 550 - 304 = 1260 > 1000
     assert.equal(b.finance.transportCost, 140); // 60 + 500 × 0,15
     assert.equal(b.finance.netMargin, a.finance.netMargin, 'formule stricte inchangée');
-    assert.equal(b.finance.netMarginAfterTransport, 1120);
+    assert.equal(b.finance.realNetMargin, 1120);
     assert.equal(b.zone, 'france');
     const veryFar = scoreListing({ ...far, distanceKm: 900 }, { now: NOW }); // 60 + 135 = 200 -> 1060
     assert.equal(veryFar.status.key, 'PEPITE');
-    const farther = scoreListing({ ...far, marketPrice: 8700, distanceKm: 900 }, { now: NOW }); // 1160 - 200 = 960
+    const farther = scoreListing({ ...far, marketPrice: 9004, distanceKm: 900 }, { now: NOW }); // 1160 - 200 = 960
     assert.equal(farther.status.key, 'SURVEILLER');
   });
 

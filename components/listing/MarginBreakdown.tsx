@@ -28,12 +28,16 @@ export function MarginBreakdown({ analysis }: { analysis: Analysis }) {
         <div className="mt-1 border-t border-ink-100 pt-1">
           <Row label="Marge nette estimée" value={signedEur(f.netMargin)} strong />
         </div>
-        {f.transportCost > 0 && (
-          <>
-            <Row label="Rapatriement" value={`− ${eur(f.transportCost)}`} muted hint={`${analysis.distanceKm} km : billet + route`} />
-            <Row label="Marge nette après rapatriement" value={signedEur(f.netMarginAfterTransport)} strong />
-          </>
+        {f.transportCost > 0 && <Row label="Rapatriement" value={`− ${eur(f.transportCost)}`} muted hint={`${analysis.distanceKm} km : billet + route`} />}
+        {f.registrationCost > 0 && (
+          <Row
+            label="Carte grise"
+            value={`− ${eur(f.registrationCost)}`}
+            muted
+            hint={`${f.registration.cv} CV${f.registration.estimatedCv ? ' estimés' : ''}${f.registration.halved ? ', −50 % +10 ans' : ''}`}
+          />
         )}
+        {f.realNetMargin !== f.netMargin && <Row label="Marge réelle (dans ta poche)" value={signedEur(f.realNetMargin)} strong />}
         {f.triggersBonus > 0 && (
           <Row label="Potentiel options (hors statut)" value={signedEur(f.triggersBonus)} muted hint="argument de revente" />
         )}
@@ -43,13 +47,15 @@ export function MarginBreakdown({ analysis }: { analysis: Analysis }) {
         <Row label="Leviers de négo" value={f.leversTotal ? `− ${eur(f.leversTotal)}` : '—'} muted />
         <Row label="Prix d'achat cible" value={eur(f.targetPrice)} />
         <Row label="Coût réel des défauts" value={f.leversRealCost ? `− ${eur(f.leversRealCost)}` : '—'} muted />
-        {f.transportCost > 0 && <Row label="Rapatriement" value={`− ${eur(f.transportCost)}`} muted />}
+        {f.transportCost + f.registrationCost > 0 && <Row label="Rapatriement + carte grise" value={`− ${eur(f.transportCost + f.registrationCost)}`} muted />}
         <div className="mt-1 border-t border-ink-100 pt-1">
           <Row label="Marge nette négociée" value={signedEur(f.negotiatedNetMargin)} strong />
         </div>
         <div className="mt-3 rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-600">
           Prix d&apos;achat max pour statut PÉPITE ({analysis.segmentLabel.toLowerCase()} &gt; {eur(analysis.threshold)}) :{' '}
           <strong className="tabular text-ink-900">{eur(f.maxBuyPriceForPepite)}</strong>
+          <br />
+          Prix plafond (marge réelle à 0, ne jamais dépasser) : <strong className="tabular text-ink-900">{eur(f.walkAwayPrice)}</strong>
           {analysis.puretechCondition && (
             <>
               <br />
