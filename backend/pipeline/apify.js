@@ -21,14 +21,19 @@ async function apify(path, { token, method = 'GET', body, fetchImpl = fetch }) {
 
 /**
  * Lance un run asynchrone avec webhook de retour (succès ou échec).
- * @param {{ token: string, source: import('../config/sources.js').HuntSource, webhookUrl: string, webhookSecret: string, maxChargeUsd: number, fetchImpl?: typeof fetch }} params
+ * bypassSecret : jeton "Protection Bypass for Automation" de Vercel, pour traverser la
+ * protection du déploiement (le dashboard reste privé, seul le webhook passe).
+ * @param {{ token: string, source: import('../config/sources.js').HuntSource, webhookUrl: string, webhookSecret: string, maxChargeUsd: number, bypassSecret?: string, fetchImpl?: typeof fetch }} params
  */
-export async function startRun({ token, source, webhookUrl, webhookSecret, maxChargeUsd, fetchImpl }) {
+export async function startRun({ token, source, webhookUrl, webhookSecret, maxChargeUsd, bypassSecret, fetchImpl }) {
   const webhooks = [
     {
       eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED', 'ACTOR.RUN.TIMED_OUT', 'ACTOR.RUN.ABORTED'],
       requestUrl: `${webhookUrl}?source=${encodeURIComponent(source.key)}`,
-      headersTemplate: JSON.stringify({ 'x-ingest-secret': webhookSecret }),
+      headersTemplate: JSON.stringify({
+        'x-ingest-secret': webhookSecret,
+        ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
+      }),
     },
   ];
   const query = new URLSearchParams({

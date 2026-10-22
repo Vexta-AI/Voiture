@@ -172,6 +172,9 @@ describe('Apify & sources', () => {
     const [hook] = JSON.parse(Buffer.from(call.url.searchParams.get('webhooks'), 'base64').toString());
     assert.equal(hook.requestUrl, `https://app.test/api/hunt/ingest?source=${source.key}`);
     assert.deepEqual(JSON.parse(hook.headersTemplate), { 'x-ingest-secret': 's3cret' });
+    await startRun({ token: 'tok', source, webhookUrl: 'https://app.test/api/hunt/ingest', webhookSecret: 's3cret', maxChargeUsd: 1, bypassSecret: 'byp', fetchImpl });
+    const [hook2] = JSON.parse(Buffer.from(call.url.searchParams.get('webhooks'), 'base64').toString());
+    assert.equal(JSON.parse(hook2.headersTemplate)['x-vercel-protection-bypass'], 'byp');
     const input = JSON.parse(call.init.body);
     assert.deepEqual(input.proxyConfiguration, { useApifyProxy: true, apifyProxyGroups: ['RESIDENTIAL'], apifyProxyCountry: 'FR' });
   });
