@@ -2,9 +2,9 @@
  * SOURCES DE LA CHASSE AUTOMATIQUE (Apify -> LeBonCoin)
  *
  * Trois familles de recherches :
- *   - fresh  : dernières annonces de la zone (alerte PÉPITE au plus tôt)
- *   - stale  : annonces les plus anciennes de la zone (cible Mandat J+15)
- *   - market : recherches larges par modèle, sans alerte, pour calculer la cote (médiane des comparables)
+ *   - fresh  : dernières annonces de la zone, chaque jour (alerte PÉPITE au plus tôt)
+ *   - stale  : annonces les plus anciennes de la zone, chaque semaine (cible Mandat J+15)
+ *   - market : recherches larges par modèle, chaque semaine, sans alerte, pour la cote (médiane des comparables)
  *
  * Les recherches fresh/stale passent par une URL LeBonCoin (le scraper l'accepte telle quelle).
  * Pour cibler précisément ta zone : fais la recherche sur leboncoin.fr, copie l'URL, et colle-la
@@ -18,18 +18,18 @@ export const APIFY_ACTOR_ID = 'bovi~leboncoin-listings';
 /** Catégories LeBonCoin : 2 = voitures, 3 = motos. */
 export const LBC_CATEGORY = { auto: '2', moto: '3' };
 
-/** Zone par défaut (format "Ville_CodePostal" de LeBonCoin). */
-export const DEFAULT_LOCATION = 'Bordeaux_33000';
+/** Zone par défaut : 200 km autour du point fourni (Gironde), comme l'URL LeBonCoin lat/lng/radius. */
+export const DEFAULT_AREA = { lat: 44.90100112020876, lng: -0.7400689834642227, radiusKm: 200 };
 
 /** Garde-fous de coût, réglables par variables d'environnement. */
 export const HUNT_LIMITS = {
   /** Annonces max par recherche fresh/stale. */
-  maxItems: 100,
+  maxItems: 50,
   /** Annonces max par recherche de comparables. */
-  marketMaxItems: 60,
+  marketMaxItems: 30,
   /** Plafond de dépense Apify par run (USD), transmis à Apify. */
   maxChargeUsd: 1,
-  /** Jour de la semaine (0 = dimanche) où les comparables sont rafraîchis. */
+  /** Jour de la semaine (0 = dimanche) des recherches hebdomadaires (stale + comparables). */
   marketWeekday: 1,
   /** Durée de conservation des runs en stock (jours). */
   retentionDays: 90,
@@ -56,11 +56,13 @@ const MARKET_QUERIES = {
   },
 };
 
-function lbcSearchUrl({ type, location, order }) {
+function lbcSearchUrl({ type, area, order }) {
   const { min, max } = BUDGETS[type];
   const params = new URLSearchParams({
     category: LBC_CATEGORY[type],
-    locations: location,
+    lat: String(area.lat),
+    lng: String(area.lng),
+    radius: String(Math.round(area.radiusKm * 1000)),
     price: `${min}-${max}`,
     sort: 'time',
     order,
@@ -76,22 +78,33 @@ function lbcSearchUrl({ type, location, order }) {
  * @property {Record<string, unknown>} input  input du scraper (hors proxy)
  */
 
+/** "44.90,-0.74,200" -> { lat, lng, radiusKm } ; null si invalide. */
+export function parseArea(value) {
+  const parts = String(value ?? '').split(',').map((p) => Number(p.trim()));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return null;
+  const [lat, lng, radiusKm] = parts;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180 || radiusKm <= 0 || radiusKm > 1000) return null;
+  return { lat, lng, radiusKm };
+}
+
 /**
- * @param {{ location?: string, maxItems?: number, marketMaxItems?: number, includeMarket?: boolean }} [options]
+ * @param {{ area?: { lat: number, lng: number, radiusKm: number }, maxItems?: number, marketMaxItems?: number, includeWeekly?: boolean }} [options]
  * @returns {HuntSource[]}
  */
 export function defaultSources(options = {}) {
-  const location = options.location ?? DEFAULT_LOCATION;
+  const area = options.area ?? DEFAULT_AREA;
   const maxItems = options.maxItems ?? HUNT_LIMITS.maxItems;
   const marketMaxItems = options.marketMaxItems ?? HUNT_LIMITS.marketMaxItems;
 
   /** @type {HuntSource[]} */
   const sources = [];
   for (const type of /** @type {const} */ (['auto', 'moto'])) {
-    sources.push({ key: `fresh-${type}`, kind: 'fresh', type, input: { searchUrl: lbcSearchUrl({ type, location, order: 'desc' }), maxItems } });
-    sources.push({ key: `stale-${type}`, kind: 'stale', type, input: { searchUrl: lbcSearchUrl({ type, location, order: 'asc' }), maxItems } });
+    sources.push({ key: `fresh-${type}`, kind: 'fresh', type, input: { searchUrl: lbcSearchUrl({ type, area, order: 'desc' }), maxItems } });
+    if (options.includeWeekly) {
+      sources.push({ key: `stale-${type}`, kind: 'stale', type, input: { searchUrl: lbcSearchUrl({ type, area, order: 'asc' }), maxItems } });
+    }
   }
-  if (options.includeMarket) {
+  if (options.includeWeekly) {
     for (const type of /** @type {const} */ (['auto', 'moto'])) {
       const targets = type === 'auto' ? AUTO_TARGETS : MOTO_TARGETS;
       const { min, max } = BUDGETS[type];

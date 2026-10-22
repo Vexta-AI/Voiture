@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { defaultSources } from '../config/sources.js';
+import { DEFAULT_AREA, defaultSources, parseArea } from '../config/sources.js';
 import { getDatasetItems, startRun } from './apify.js';
 import { alertKey, priceListings, selectAlerts } from './hunt.js';
 import { estimateMarketPrice, modelKey } from './market.js';
@@ -183,13 +183,27 @@ describe('Apify & sources', () => {
     await assert.rejects(getDatasetItems({ token: 't', datasetId: 'd', fetchImpl: async () => new Response('nope', { status: 401 }) }), /401/);
   });
 
-  it('sources : fresh + stale par type, comparables seulement sur demande', () => {
-    const base = defaultSources();
-    assert.deepEqual(base.map((s) => s.key), ['fresh-auto', 'stale-auto', 'fresh-moto', 'stale-moto']);
-    assert.ok(base.every((s) => typeof s.input.searchUrl === 'string' && s.input.searchUrl.startsWith('https://www.leboncoin.fr/recherche?')));
-    const withMarket = defaultSources({ includeMarket: true });
-    const market = withMarket.filter((s) => s.kind === 'market');
-    assert.ok(market.length >= 10);
-    assert.equal(new Set(withMarket.map((s) => s.key)).size, withMarket.length, 'clés uniques');
+  it('sources : fresh chaque jour, stale + comparables chaque semaine', () => {
+    const daily = defaultSources();
+    assert.deepEqual(daily.map((s) => s.key), ['fresh-auto', 'fresh-moto']);
+    const url = new URL(daily[0].input.searchUrl);
+    assert.equal(url.origin + url.pathname, 'https://www.leboncoin.fr/recherche');
+    assert.equal(url.searchParams.get('category'), '2');
+    assert.equal(url.searchParams.get('lat'), String(DEFAULT_AREA.lat));
+    assert.equal(url.searchParams.get('lng'), String(DEFAULT_AREA.lng));
+    assert.equal(url.searchParams.get('radius'), '200000');
+    assert.equal(url.searchParams.get('price'), '3000-30000');
+    assert.equal(new URL(daily[1].input.searchUrl).searchParams.get('category'), '3');
+    const weekly = defaultSources({ includeWeekly: true });
+    assert.ok(weekly.some((s) => s.key === 'stale-auto') && weekly.some((s) => s.key === 'stale-moto'));
+    assert.ok(weekly.filter((s) => s.kind === 'market').length >= 10);
+    assert.equal(new Set(weekly.map((s) => s.key)).size, weekly.length, 'clés uniques');
+  });
+
+  it('zone : parse "lat,lng,rayonKm" et rejette les valeurs absurdes', () => {
+    assert.deepEqual(parseArea('44.9, -0.74, 150'), { lat: 44.9, lng: -0.74, radiusKm: 150 });
+    assert.equal(parseArea('44.9,-0.74'), null);
+    assert.equal(parseArea('200,0,10'), null);
+    assert.equal(parseArea(undefined), null);
   });
 });

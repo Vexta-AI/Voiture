@@ -5,7 +5,7 @@ import { priceListings, selectAlerts } from '@/backend/pipeline/hunt.js';
 import { dedupeById } from '@/backend/pipeline/market.js';
 import { normalizeApifyItem } from '@/backend/pipeline/normalize.js';
 import { formatTelegramAlert, sendTelegram } from '@/backend/pipeline/telegram.js';
-import { HUNT_LIMITS, defaultSources, type HuntSource } from '@/backend/config/sources.js';
+import { HUNT_LIMITS, defaultSources, parseArea, type HuntSource } from '@/backend/config/sources.js';
 
 import { alertAlreadySent, loadRuns, markAlertSent, pruneRuns, saveRun, storeEnabled } from './store';
 import type { Listing } from './types';
@@ -20,8 +20,10 @@ export function huntConfig() {
     telegramToken: env.TELEGRAM_BOT_TOKEN ?? '',
     telegramChatId: env.TELEGRAM_CHAT_ID ?? '',
     appUrl: host.replace(/\/$/, ''),
-    location: env.HUNT_LOCATION || undefined,
+    /** "lat,lng,rayonKm" — défaut : 200 km autour de la Gironde. */
+    area: parseArea(env.HUNT_AREA) ?? undefined,
     maxItems: Number(env.HUNT_MAX_ITEMS) || HUNT_LIMITS.maxItems,
+    marketMaxItems: Number(env.HUNT_MARKET_MAX_ITEMS) || HUNT_LIMITS.marketMaxItems,
     maxChargeUsd: Number(env.APIFY_MAX_CHARGE_USD) || HUNT_LIMITS.maxChargeUsd,
     customSources: env.HUNT_SOURCES,
     /** Fourni par Vercel quand "Protection Bypass for Automation" est activé sur le projet. */
@@ -32,8 +34,8 @@ export function huntConfig() {
 type Config = ReturnType<typeof huntConfig>;
 
 /** Sources actives : HUNT_SOURCES (JSON) remplace les recherches fresh/stale par défaut. */
-export function resolveSources(config: Config, includeMarket: boolean): HuntSource[] {
-  const defaults = defaultSources({ location: config.location, maxItems: config.maxItems, includeMarket });
+export function resolveSources(config: Config, includeWeekly: boolean): HuntSource[] {
+  const defaults = defaultSources({ area: config.area, maxItems: config.maxItems, marketMaxItems: config.marketMaxItems, includeWeekly });
   if (!config.customSources) return defaults;
   let custom: unknown;
   try {
@@ -62,12 +64,12 @@ export function missingConfig(config: Config, needs: ('apify' | 'store' | 'inges
   return missing;
 }
 
-/** Lance les runs Apify du jour (comparables inclus le jour configuré). */
-export async function startHunt(options: { now?: Date; includeMarket?: boolean } = {}) {
+/** Lance les runs Apify du jour (recherches hebdomadaires stale + comparables le jour configuré). */
+export async function startHunt(options: { now?: Date; includeWeekly?: boolean } = {}) {
   const config = huntConfig();
   const now = options.now ?? new Date();
-  const includeMarket = options.includeMarket ?? now.getUTCDay() === HUNT_LIMITS.marketWeekday;
-  const sources = resolveSources(config, includeMarket);
+  const includeWeekly = options.includeWeekly ?? now.getUTCDay() === HUNT_LIMITS.marketWeekday;
+  const sources = resolveSources(config, includeWeekly);
 
   const results = await Promise.allSettled(
     sources.map((source) =>
@@ -84,7 +86,7 @@ export async function startHunt(options: { now?: Date; includeMarket?: boolean }
   const pruned = await pruneRuns(HUNT_LIMITS.retentionDays).catch(() => 0);
 
   return {
-    includeMarket,
+    includeWeekly,
     pruned,
     runs: results.map((r, i) =>
       r.status === 'fulfilled' ? { source: sources[i].key, ...r.value } : { source: sources[i].key, error: String(r.reason?.message ?? r.reason) },
