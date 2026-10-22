@@ -10,7 +10,8 @@ export const maxDuration = 60;
 /**
  * GET /api/hunt/start — appelé par Vercel Cron (Authorization: Bearer CRON_SECRET).
  * Lance les recherches Apify ; chaque run rappelle /api/hunt/ingest à la fin.
- * Déclenchement manuel : même en-tête, ?market=1 pour forcer le rafraîchissement des comparables.
+ * Déclenchement manuel : même en-tête, ?weekly=1 pour forcer aussi les recherches hebdomadaires
+ * (annonces anciennes + comparables), indispensable au tout premier lancement.
  */
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
@@ -18,9 +19,10 @@ export async function GET(request: Request) {
   const missing = missingConfig(huntConfig(), ['apify', 'ingest', 'url', 'store']);
   if (missing.length) return NextResponse.json({ ok: false, error: 'missing_config', missing }, { status: 503 });
 
-  const market = new URL(request.url).searchParams.get('market');
+  const params = new URL(request.url).searchParams;
+  const weekly = params.get('weekly') === '1' || params.get('market') === '1';
   try {
-    const result = await startHunt({ includeMarket: market === '1' ? true : undefined });
+    const result = await startHunt({ includeWeekly: weekly ? true : undefined });
     const failed = result.runs.filter((r) => 'error' in r).length;
     return NextResponse.json({ ok: failed === 0, ...result }, { status: failed === result.runs.length ? 502 : 200 });
   } catch (error) {
