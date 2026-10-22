@@ -54,6 +54,12 @@ export function ListingCard({
             <Chip tone={analysis.daysOnline >= 15 ? 'blue' : 'slate'} title="Jours en ligne">
               J+{analysis.daysOnline}
             </Chip>
+            {analysis.distanceKm !== null && (
+              <Chip tone={analysis.zone === 'france' ? 'amber' : 'green'} title={analysis.zone === 'france' ? 'Hors zone prioritaire : rapatriement déduit' : 'Zone prioritaire'}>
+                {analysis.zone === 'france' ? '🚚 ' : '📍 '}
+                {analysis.distanceKm} km
+              </Chip>
+            )}
           </div>
           <h3 className="mt-1.5 truncate text-[15px] font-semibold text-ink-900" title={listing.title}>
             {listing.title}
@@ -88,7 +94,9 @@ export function ListingCard({
           ) : (
             <>
               <dt className="text-[11px] uppercase tracking-wide text-ink-400">Marge nette</dt>
-              <dd className={cn('tabular text-sm font-bold', MARGIN_TONE[analysis.status.key])}>{refused ? '—' : signedEur(f.netMargin)}</dd>
+              <dd className={cn('tabular text-sm font-bold', MARGIN_TONE[analysis.status.key])}>
+                {refused ? '—' : signedEur(f.transportCost > 0 ? f.netMarginAfterTransport : f.netMargin)}
+              </dd>
             </>
           )}
         </div>

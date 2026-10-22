@@ -2,7 +2,14 @@ import { cn } from '@/lib/format';
 import type { StatusKey, TabKey } from '@/lib/types';
 
 export type StatusFilter = 'ALL' | StatusKey;
-export type SortKey = 'score' | 'margin' | 'days' | 'price' | 'mandate';
+export type SortKey = 'score' | 'margin' | 'days' | 'price' | 'distance' | 'mandate';
+export type ZoneFilter = 'all' | 'prioritaire' | 'france';
+
+export interface Option {
+  id: string;
+  label: string;
+  count?: number;
+}
 
 const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
   { key: 'ALL', label: 'Tous' },
@@ -11,11 +18,45 @@ const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
   { key: 'REFUSE', label: 'Refusés' },
 ];
 
+/** Groupe de puces à choix unique (« all » = pas de filtre). */
+function Segmented({ label, options, value, onChange }: { label: string; options: Option[]; value: string; onChange: (id: string) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="w-16 shrink-0 text-xs font-medium text-ink-500">{label}</span>
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          aria-pressed={value === o.id}
+          className={cn(
+            'rounded-full border px-3 py-1 text-xs font-medium transition',
+            value === o.id ? 'border-ink-900 bg-ink-900 text-surface' : 'border-ink-200 bg-surface text-ink-600 hover:border-ink-300',
+          )}
+        >
+          {o.label}
+          {o.count !== undefined && <span className="tabular ml-1 opacity-60">{o.count}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function FilterBar({
   tab,
+  zones,
+  zone,
+  onZone,
+  gammes,
+  gamme,
+  onGamme,
+  bands,
+  band,
+  onBand,
   targets,
   selectedTargets,
   onToggleTarget,
+  onClearTargets,
   status,
   statusCounts,
   onStatus,
@@ -25,9 +66,19 @@ export function FilterBar({
   onQuery,
 }: {
   tab: TabKey;
-  targets: { id: string; label: string; cursus?: boolean; family?: string }[];
+  zones: Option[];
+  zone: ZoneFilter;
+  onZone: (z: ZoneFilter) => void;
+  gammes: Option[];
+  gamme: string;
+  onGamme: (g: string) => void;
+  bands: Option[];
+  band: string;
+  onBand: (b: string) => void;
+  targets: { id: string; label: string }[];
   selectedTargets: string[];
   onToggleTarget: (id: string) => void;
+  onClearTargets: () => void;
   status: StatusFilter;
   statusCounts: Record<StatusKey, number>;
   onStatus: (s: StatusFilter) => void;
@@ -38,10 +89,25 @@ export function FilterBar({
 }) {
   const total = statusCounts.PEPITE + statusCounts.SURVEILLER + statusCounts.REFUSE;
   return (
-    <section className="space-y-3">
+    <section className="card space-y-2.5 p-3 sm:p-4">
+      <Segmented label="Zone" options={zones} value={zone} onChange={(z) => onZone(z as ZoneFilter)} />
+      {gammes.length > 1 && <Segmented label="Gamme" options={gammes} value={gamme} onChange={onGamme} />}
+      {bands.length > 1 && <Segmented label="Budget" options={bands} value={band} onChange={onBand} />}
+
       {targets.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs font-medium text-ink-500">Cibles</span>
+          <span className="w-16 shrink-0 text-xs font-medium text-ink-500">Modèles</span>
+          <button
+            type="button"
+            onClick={onClearTargets}
+            aria-pressed={selectedTargets.length === 0}
+            className={cn(
+              'rounded-full border px-3 py-1 text-xs font-medium transition',
+              selectedTargets.length === 0 ? 'border-ink-900 bg-ink-900 text-surface' : 'border-ink-200 bg-surface text-ink-600 hover:border-ink-300',
+            )}
+          >
+            Tous
+          </button>
           {targets.map((t) => {
             const on = selectedTargets.includes(t.id);
             return (
@@ -50,7 +116,6 @@ export function FilterBar({
                 type="button"
                 onClick={() => onToggleTarget(t.id)}
                 aria-pressed={on}
-                title={t.family ?? (t.cursus ? 'Cible cursus (budget intermédiaire)' : undefined)}
                 className={cn(
                   'rounded-full border px-3 py-1 text-xs font-medium transition',
                   on ? 'border-ink-900 bg-ink-900 text-surface' : 'border-ink-200 bg-surface text-ink-600 hover:border-ink-300',
@@ -63,17 +128,14 @@ export function FilterBar({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border border-ink-200 bg-surface p-0.5">
+      <div className="flex flex-wrap items-center gap-2 border-t border-ink-100 pt-3">
+        <div className="inline-flex flex-wrap rounded-lg border border-ink-200 bg-surface p-0.5">
           {STATUS_OPTIONS.map((o) => (
             <button
               key={o.key}
               type="button"
               onClick={() => onStatus(o.key)}
-              className={cn(
-                'rounded-md px-2.5 py-1 text-xs font-medium transition',
-                status === o.key ? 'bg-ink-900 text-surface' : 'text-ink-600 hover:bg-ink-50',
-              )}
+              className={cn('rounded-md px-2.5 py-1 text-xs font-medium transition', status === o.key ? 'bg-ink-900 text-surface' : 'text-ink-600 hover:bg-ink-50')}
             >
               {o.label} <span className="tabular opacity-70">{o.key === 'ALL' ? total : statusCounts[o.key]}</span>
             </button>
@@ -91,6 +153,7 @@ export function FilterBar({
           <select value={sort} onChange={(e) => onSort(e.target.value as SortKey)} className="input h-8 w-auto py-1">
             <option value="score">{tab === 'mandat' ? 'Revenu mandat' : 'Score'}</option>
             <option value="margin">Marge nette</option>
+            <option value="distance">Distance</option>
             <option value="days">Jours en ligne</option>
             <option value="price">Prix croissant</option>
           </select>

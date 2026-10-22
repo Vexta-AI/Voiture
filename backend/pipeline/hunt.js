@@ -49,7 +49,8 @@ export function selectAlerts(priced, options = {}) {
     })
     // Un prix sous 50 % de la cote est un signal d'arnaque ou de cote faussée, pas une pépite.
     .filter((c) => c.payload.ok && c.listing.price >= c.listing.marketPrice * MARKET_RULES.suspiciousRatio)
-    .sort((a, b) => b.analysis.score - a.analysis.score)
+    // Zone prioritaire d'abord, puis le meilleur score.
+    .sort((a, b) => (a.analysis.zone === 'france' ? 1 : 0) - (b.analysis.zone === 'france' ? 1 : 0) || b.analysis.score - a.analysis.score)
     .slice(0, options.maxAlerts ?? MAX_ALERTS_PER_RUN)
     .map((c) => ({ ...c, key: alertKey(c.listing.id, c.payload.ok ? c.payload.strategy : 'none', c.listing.price) }));
 }

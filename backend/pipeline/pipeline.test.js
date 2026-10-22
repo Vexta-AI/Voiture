@@ -7,6 +7,7 @@ import { alertKey, priceListings, selectAlerts } from './hunt.js';
 import { distanceKm, filterArea } from './geo.js';
 import { estimateMarketPrice, modelKey, variantOf } from './market.js';
 import { normalizeApifyItem, toInt } from './normalize.js';
+import { scoreListing } from '../utils/scoring.js';
 import { formatTelegramAlert, sendTelegram } from './telegram.js';
 
 const NOW = new Date('2026-10-22T12:00:00Z');
@@ -105,14 +106,15 @@ describe('Cote par comparables', () => {
 describe('Zone & variantes (bugs vus en production)', () => {
   const area = { lat: 44.901, lng: -0.74, radiusKm: 200 };
 
-  it('garde Bordeaux, rejette Paris, la Martinique et les annonces sans GPS', () => {
+  it('Bordeaux en zone prioritaire, Paris en France, Martinique et sans GPS écartées', () => {
     const bordeaux = listing({ ad_id: 1, location_lat: 44.84, location_lng: -0.58 });
     const paris = listing({ ad_id: 2, location_lat: 48.82, location_lng: 2.21, location_zipcode: '92310' });
     const martinique = listing({ ad_id: 3, location_lat: 14.79, location_lng: -61.11, location_zipcode: '97218' });
     const noGps = listing({ ad_id: 4 });
-    const { kept, stats } = filterArea([bordeaux, paris, martinique, noGps], area);
-    assert.deepEqual(kept.map((l) => l.id), ['lbc-1']);
-    assert.deepEqual({ in: stats.inArea, out: stats.outOfArea, none: stats.noCoords }, { in: 1, out: 2, none: 1 });
+    const { kept, stats } = filterArea([paris, bordeaux, martinique, noGps], area);
+    assert.deepEqual(kept.map((l) => [l.id, l.zone]), [['lbc-1', 'prioritaire'], ['lbc-2', 'france']]);
+    assert.deepEqual({ p: stats.prioritaire, f: stats.france, h: stats.hors, none: stats.noCoords }, { p: 1, f: 1, h: 1, none: 1 });
+    assert.deepEqual(filterArea([paris, bordeaux], area, { national: false }).kept.map((l) => l.id), ['lbc-1']);
     assert.ok(Math.abs(distanceKm({ lat: 44.84, lng: -0.58 }, { lat: 48.86, lng: 2.35 }) - 500) < 15);
   });
 
@@ -135,6 +137,31 @@ describe('Zone & variantes (bugs vus en production)', () => {
     const suspect = listing({ ad_id: 7, price: 3000 });
     const { priced } = priceListings([suspect], comps([8700, 8900, 9000, 9100, 9300]));
     assert.equal(selectAlerts(priced, { now: NOW }).length, 0);
+  });
+});
+
+describe('Achat à distance', () => {
+  it('déduit le rapatriement : une pépite à 500 km peut redevenir "à surveiller"', () => {
+    const base = { ad_id: 8, price: 6990 };
+    const near = { ...listing(base), marketPrice: 8800, zone: 'prioritaire', distanceKm: 40 };
+    const far = { ...listing(base), marketPrice: 8800, zone: 'france', distanceKm: 500 };
+    const a = scoreListing(near, { now: NOW });
+    const b = scoreListing(far, { now: NOW });
+    assert.equal(a.finance.transportCost, 0);
+    assert.equal(a.status.key, 'PEPITE'); // 8800 - 6990 - 550 = 1260 > 1000
+    assert.equal(b.finance.transportCost, 140); // 60 + 500 × 0,15
+    assert.equal(b.finance.netMargin, a.finance.netMargin, 'formule stricte inchangée');
+    assert.equal(b.finance.netMarginAfterTransport, 1120);
+    assert.equal(b.zone, 'france');
+    const veryFar = scoreListing({ ...far, distanceKm: 900 }, { now: NOW }); // 60 + 135 = 200 -> 1060
+    assert.equal(veryFar.status.key, 'PEPITE');
+    const farther = scoreListing({ ...far, marketPrice: 8700, distanceKm: 900 }, { now: NOW }); // 1160 - 200 = 960
+    assert.equal(farther.status.key, 'SURVEILLER');
+  });
+
+  it('pas de mandat hors zone prioritaire', () => {
+    const old = { ...listing({ ad_id: 9, published_date: daysAgo(20) }), marketPrice: 9000, zone: 'france', distanceKm: 400 };
+    assert.equal(scoreListing(old, { now: NOW }).mandateEligible, false);
   });
 });
 
@@ -242,7 +269,8 @@ describe('Apify & sources', () => {
 
   it('sources : fresh chaque jour, stale + comparables chaque semaine', () => {
     const daily = defaultSources();
-    assert.deepEqual(daily.map((s) => s.key), ['fresh-auto', 'fresh-moto']);
+    assert.deepEqual(daily.map((s) => s.key), ['fresh-auto', 'fresh-auto-fr', 'fresh-moto', 'fresh-moto-fr']);
+    assert.equal(new URL(daily[1].input.searchUrl).searchParams.get('lat'), null, 'recherche nationale sans zone');
     const url = new URL(daily[0].input.searchUrl);
     assert.equal(url.origin + url.pathname, 'https://www.leboncoin.fr/recherche');
     assert.equal(url.searchParams.get('category'), '2');
@@ -250,7 +278,7 @@ describe('Apify & sources', () => {
     assert.equal(url.searchParams.get('lng'), String(DEFAULT_AREA.lng));
     assert.equal(url.searchParams.get('radius'), '200000');
     assert.equal(url.searchParams.get('price'), '3000-30000');
-    assert.equal(new URL(daily[1].input.searchUrl).searchParams.get('category'), '3');
+    assert.equal(new URL(daily[2].input.searchUrl).searchParams.get('category'), '3');
     const weekly = defaultSources({ includeWeekly: true });
     assert.ok(weekly.some((s) => s.key === 'stale-auto') && weekly.some((s) => s.key === 'stale-moto'));
     assert.ok(weekly.filter((s) => s.kind === 'market').length >= 10);

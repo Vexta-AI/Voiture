@@ -122,8 +122,9 @@ Apify (fin de run) → /api/hunt/ingest → relit le run chez Apify → normalis
 ```
 
 - **Modèles** : le radar scanne tous les véhicules de la zone dans le budget ; les modèles ciblés (top ventes VO : Clio, C3, 208, 2008, Sandero, Captur, Yaris, 308, 3008, Mégane, Duster, Corsa, Polo, Golf, Tesla, Classe A, A3 ; motos : MT-07/09, Z650/800/900, GS, Ténéré 700, T-Max, X-ADV, CB650, Africa Twin, Triumph, SV650) ont en plus des recherches de comparables pour fiabiliser la cote.
-- **Zone** : 200 km autour de la Gironde (44.901, -0.740) par défaut, voitures (catégorie 2) et motos (catégorie 3) séparément. Modifiable avec `HUNT_AREA=lat,lng,rayonKm`.
-- **Recherches** : `fresh` chaque jour (dernières annonces, alertes PÉPITE) ; chaque lundi, `stale` (annonces les plus anciennes, cibles Mandat J+15) et `market` (recherches larges par modèle, pour la cote).
+- **Zones** : *prioritaire* = 200 km autour de la base (44.901, -0.740, Nouvelle-Aquitaine), puis *France* métropolitaine (DOM-TOM exclus). Chaque annonce est replacée par ses coordonnées GPS. Hors zone prioritaire, le rapatriement (60 € + 0,15 €/km) est déduit de la marge avant de parler de pépite, et le mandat est exclu. Modifiable avec `HUNT_AREA=lat,lng,rayonKm`.
+- **Gammes et budgets** : citadine / compacte / SUV / premium (motos : roadster, trail, maxi-scooter…), tranches 3–6, 6–10, 10–20, 20–30 k€. Filtres du dashboard : zone, gamme, budget, modèles, statut, tri par distance.
+- **Recherches** : `fresh` chaque jour, zone prioritaire puis France entière (dernières annonces, alertes PÉPITE, zone prioritaire en tête) ; chaque lundi, `stale` (annonces les plus anciennes, cibles Mandat J+15) et `market` (recherches larges par modèle, pour la cote).
 - **Cote** : médiane des annonces comparables (même modèle, ±1 an et ±35 % de km, puis ±2 ans et ±60 %), 4 comparables minimum, 10 % d'extrêmes retirés au-delà de 10. Pas assez de comparables = pas de cote = pas d'alerte : aucune marge n'est inventée.
 - **File d'attente** : le plan gratuit Apify limite à 5 runs simultanés. Le cron lance 4 recherches (`APIFY_MAX_CONCURRENT`), puis chaque run terminé lance la suivante du lot. Un verrou dans Blob empêche de lancer deux fois la même recherche.
 - **Alertes** : 10 max par run, triées par score. Une annonce déjà signalée ne l'est plus, sauf baisse de prix.

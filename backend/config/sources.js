@@ -2,7 +2,7 @@
  * SOURCES DE LA CHASSE AUTOMATIQUE (Apify -> LeBonCoin)
  *
  * Trois familles de recherches :
- *   - fresh  : dernières annonces de la zone, chaque jour (alerte PÉPITE au plus tôt)
+ *   - fresh  : dernières annonces, chaque jour : zone prioritaire puis France entière (alerte PÉPITE)
  *   - stale  : annonces les plus anciennes de la zone, chaque semaine (cible Mandat J+15)
  *   - market : recherches larges par modèle, chaque semaine, sans alerte, pour la cote (médiane des comparables)
  *
@@ -80,9 +80,7 @@ function lbcSearchUrl({ type, area, order }) {
   const { min, max } = BUDGETS[type];
   const params = new URLSearchParams({
     category: LBC_CATEGORY[type],
-    lat: String(area.lat),
-    lng: String(area.lng),
-    radius: String(Math.round(area.radiusKm * 1000)),
+    ...(area ? { lat: String(area.lat), lng: String(area.lng), radius: String(Math.round(area.radiusKm * 1000)) } : {}),
     price: `${min}-${max}`,
     sort: 'time',
     order,
@@ -129,7 +127,9 @@ export function defaultSources(options = {}) {
   const sources = [];
   const types = options.types?.length ? options.types : /** @type {('auto'|'moto')[]} */ (['auto', 'moto']);
   for (const type of types) {
+    // Zone prioritaire d'abord, puis toute la France (le rapatriement est déduit de la marge).
     sources.push({ key: `fresh-${type}`, kind: 'fresh', type, input: { searchUrl: lbcSearchUrl({ type, area, order: 'desc' }), maxItems } });
+    sources.push({ key: `fresh-${type}-fr`, kind: 'fresh', type, input: { searchUrl: lbcSearchUrl({ type, area: null, order: 'desc' }), maxItems } });
     if (options.includeWeekly) {
       sources.push({ key: `stale-${type}`, kind: 'stale', type, input: { searchUrl: lbcSearchUrl({ type, area, order: 'asc' }), maxItems } });
     }

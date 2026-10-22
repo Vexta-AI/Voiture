@@ -51,6 +51,12 @@ export const SEGMENTS = {
     targetNetMargin: [2000, 4000],
     budget: [10000, 25000],
   },
+  suv: {
+    label: 'SUV',
+    pepiteThreshold: 2000,
+    targetNetMargin: [2000, 4000],
+    budget: [10000, 25000],
+  },
   premium: {
     label: 'Premium',
     pepiteThreshold: 2000,
@@ -77,6 +83,15 @@ export const SEGMENT_RULES = [
     versionPatterns: ['gti', 'golfr', 'amg'],
   },
   {
+    // Avant les citadines : "C3 Aircross" est un SUV, pas une C3.
+    segment: 'suv',
+    patterns: [
+      'peugeot2008', 'peugeot3008', 'peugeot5008', 'captur', 'duster', 'tiguan', 'troc', 'tcross', 'qashqai', 'juke',
+      'kadjar', 'arkana', 'austral', 'c3aircross', 'c5aircross', 'kona', 'tucson', 'sportage', 'stonic', 'kamiq', 'karoq',
+      'ateca', 'arona', 'mokka', 'grandland', 'crossland', 'yariscross', 'chr', 'rav4', 'puma', 'kuga', 'q2', 'q3', 'glaclasse', 'gla',
+    ],
+  },
+  {
     segment: 'citadine',
     patterns: [
       'clio', 'twingo', '208', 'peugeot108', 'polo', 'citroenc3', 'citroenc1', 'corsa', 'yaris', 'aygo',
@@ -87,10 +102,37 @@ export const SEGMENT_RULES = [
     segment: 'compacte',
     patterns: [
       'golf', '308', 'megane', 'leon', 'focus', 'octavia', 'astra', 'c4', 'auris', 'corolla', 'i30', 'ceed',
-      'peugeot2008', 'peugeot3008', 'captur', 'duster', 'tiguan', 'qashqai', 'kadjar', 'arkana',
     ],
   },
 ];
+
+/** Tranches de budget (filtres du dashboard). */
+export const PRICE_BANDS = {
+  auto: [
+    { id: 'a1', label: '3–6 k€', min: 3000, max: 6000 },
+    { id: 'a2', label: '6–10 k€', min: 6000, max: 10000 },
+    { id: 'a3', label: '10–20 k€', min: 10000, max: 20000 },
+    { id: 'a4', label: '20–30 k€', min: 20000, max: 30000 },
+  ],
+  moto: [
+    { id: 'm1', label: '5–8 k€', min: 5000, max: 8000 },
+    { id: 'm2', label: '8–12 k€', min: 8000, max: 12000 },
+    { id: 'm3', label: '12–18 k€', min: 12000, max: 18000 },
+  ],
+};
+
+/**
+ * Zones de chasse : la zone prioritaire (rayon autour de la base, Nouvelle-Aquitaine) d'abord,
+ * puis la France métropolitaine. Hors zone prioritaire, le rapatriement est déduit de la marge :
+ * billet aller + retour par la route (carburant + péages).
+ */
+export const LOGISTICS = {
+  priorityRadiusKm: 200,
+  ticketCost: 60,
+  perKm: 0.15,
+  /** France métropolitaine (Corse incluse) : les DOM-TOM sont exclus. */
+  metroBounds: { latMin: 41.2, latMax: 51.2, lngMin: -5.3, lngMax: 9.7 },
+};
 
 // ---------------------------------------------------------------------------
 // 3. Cibles de chasse (filtres des onglets)
