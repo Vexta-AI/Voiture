@@ -452,7 +452,9 @@ export function nextAction(deal, now = new Date()) {
     }
     if (!lastMsg) {
       const message = deal.firstMessage?.body ?? (deal.kind === 'revente' ? undefined : followUpMessage(deal, 1));
-      return { kind: 'contacter', label: deal.kind === 'revente' ? "Contacter l'acheteur" : 'Envoyer le premier message', dueAt: deal.createdAt, overdue: false, priority: 50 + Number(deal.numbers.score ?? 0) / 2, message };
+      // L'offre part avec le message : l'apprentissage mesure ensuite quelle remise fonctionne.
+      const offer = deal.kind === 'achat' ? Number(deal.numbers.offerPrice) || undefined : undefined;
+      return { kind: 'contacter', label: deal.kind === 'revente' ? "Contacter l'acheteur" : 'Envoyer le premier message', dueAt: deal.createdAt, overdue: false, priority: 50 + Number(deal.numbers.score ?? 0) / 2, message, offer };
     }
     if (deal.stage === 'rdv') {
       if (deal.rdvAt) {
