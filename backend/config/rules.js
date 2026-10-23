@@ -32,7 +32,9 @@ export const COSTS = {
  * 'particulier' : pas de cotisation, mais l'achat-revente habituel est une activité commerciale à déclarer.
  */
 export const BUSINESS = {
-  status: /** @type {'particulier'|'micro'} */ ('micro'),
+  // Choix de l'utilisateur (23/10/2026) : marges calculées en particulier pour l'instant, sans cotisations.
+  // Repasser à 'micro' dès la déclaration de l'activité : toutes les marges retirent alors 12,3 % / 21,2 %.
+  status: /** @type {'particulier'|'micro'} */ ('particulier'),
   salesSocialRate: 0.123,
   servicesSocialRate: 0.212,
 };
