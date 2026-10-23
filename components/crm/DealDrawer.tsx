@@ -44,6 +44,7 @@ const NUMBER_FIELDS = {
     ['purchasePrice', "Prix d'achat réel"],
     ['registrationCost', 'Carte grise'],
     ['transportCost', 'Rapatriement'],
+    ['ownershipCost', 'Assurance + annonce + trajet'],
     ['reconditioning', 'Remise en état'],
     ['extraCosts', 'Autres frais'],
     ['listedPrice', 'Prix affiché revente'],

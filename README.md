@@ -68,9 +68,12 @@ Une seule source de vérité : modifier une valeur dans `backend/config/rules.js
 | Ligne | Valeur |
 |---|---|
 | Marge brute | Cote marché pro (prix plancher de revente) − prix affiché |
-| Remise en état | − 350 € (detailing 80 € + petite méca) |
+| Remise en état | − 500 € (detailing + petite méca ; relevé de 350 € d'après les négociants, voir Sources) |
 | Capital risque | − 200 € systématiques |
-| **Marge nette** | Marge brute − 550 € |
+| **Marge nette** | Marge brute − 700 € |
+| Assurance temporaire | − ~6 €/jour pendant le délai de vente du marché (30 à 90 jours) |
+| Annonce LeBonCoin | − 80 € (2 annonces véhicule gratuites par an, puis 79,90 €) |
+| Déplacement | − aller-retour à 0,15 €/km dans ta zone (hors zone : rapatriement) |
 | Rapatriement | − 60 € + 0,15 €/km hors zone prioritaire (200 km) |
 | Carte grise | − chevaux fiscaux × 58 € (Nouvelle-Aquitaine, mars 2026), ÷ 2 au-delà de 10 ans, + 13,76 € ; 0 € en pro (`REGISTRATION.status = 'pro'` dans `rules.js`) |
 | **Marge réelle** | Marge nette − rapatriement − carte grise : **base du statut PÉPITE** |
@@ -177,7 +180,9 @@ Chaque chiffre du radar est soit **sourcé**, soit **un choix métier signalé c
 | Prix marché | médiane des annonces comparables (≥ 4, années ±1-2, km proches) | Méthode des négociants : comparer les annonces similaires ([Debard Automobiles](https://www.debardautomobiles.com/actualites/blog/comment-un-negociant-auto-fixe-le-prix-dun-vehicule-doccasion)) | Prix **affichés**, pas de vente |
 | Négo de ton acheteur à la revente | −5 % dans la « marge prudente » | 3 à 8 % de négo intégrée aux annonces ([Joinsteer](https://www.joinsteer.com/car/guide/negocier-prix-occasion), [Caroom](https://www.caroom.fr/guide/occasion/achat/prix)) | Sourcé (guides, pas d'étude officielle) |
 | Remise demandée au vendeur | ~10 %, +5 % à J+15, 800-2 500 € | 5-10 % réaliste, jusqu'à 15 % si réparations ou annonce de plus d'un mois ([Joinsteer](https://www.joinsteer.com/car/guide/negocier-prix-occasion), [Caradisiac](https://www.caradisiac.com/Achat-d-une-voiture-d-occasion-vos-armes-pour-negocier-92992.htm)) | Sourcé |
-| Remise en état | 350 € (detailing + petite méca, ton cursus) | Négociant : ~600 € + 120 € de préparation sur une 9 900 € ([Debard](https://www.debardautomobiles.com/actualites/blog/comment-un-negociant-auto-fixe-le-prix-dun-vehicule-doccasion)) ; factures finales souvent 50-100 % au-dessus du devis ([Autocopilot](https://autocopilot.fr/guides/rentabilite-achat-revente-voiture)) | **Optimiste** : à valider |
+| Remise en état | 500 € (relevé de 350 €) | Négociant : ~600 € + 120 € de préparation sur une 9 900 € ([Debard](https://www.debardautomobiles.com/actualites/blog/comment-un-negociant-auto-fixe-le-prix-dun-vehicule-doccasion)) ; factures finales souvent 50-100 % au-dessus du devis ([Autocopilot](https://autocopilot.fr/guides/rentabilite-achat-revente-voiture)) | Sourcé (prudent sans être pessimiste) |
+| Assurance temporaire | ~6 €/jour, 30 à 90 jours | ~158-210 € les 30 jours ([Assurland](https://www.assurland.com/assurance-auto/formule/temporaire/), [Assurance en direct](https://www.assuranceendirect.com/tarification-assurance-auto-temporaire.html)) ; obligatoire pour rouler dès l'achat, possible sur le VIN avec la carte grise barrée et la cession ([Groupama](https://www.groupama.fr/assurance-auto/conseils/carte-grise-assurance/)) | Sourcé (devis à faire selon ton profil) |
+| Annonce de revente | 80 € | Particulier : 2 annonces véhicule gratuites par an, puis 79,90 € l'annonce ([Presse-citron](https://www.presse-citron.net/vendre-sa-voiture-sur-leboncoin-devient-payant-etes-vous-concerne/), [Clubic](https://www.clubic.com/actualite-562317-ni-vu-ni-connu-leboncoin-vous-fait-payer-plus-cher-vos-annonces-auto.html)) | Sourcé, à vérifier sur le site LeBonCoin |
 | Capital risque | 200 € | Choix métier (imprévus) | Choix métier |
 | Marge moyenne de la profession | — | ~500 € HT/véhicule de marge brute d'activité VO ([L'argus, baromètre](https://www.largus.fr/pros/actualite-automobile/barometre-occasion-la-profession-dans-l-escalier-de-la-baisse-des-prix-30029937.html)) | Repère : tes seuils pépite (1 000 / 2 000 € réels) visent 2 à 4× la moyenne |
 | Délai de vente « marché lent » | > 90 j (> 145 j en électrique) | ~90-95 j sur leboncoin en thermique, ~145 j en électrique ([L'argus 2025](https://www.largus.fr/pros/actualite-automobile/voitures-d-occasion-les-prix-ne-baissent-plus-depuis-le-mois-de-septembre-30045002.html)) | Sourcé |

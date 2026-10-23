@@ -87,6 +87,7 @@ export function createDeal({ kind, listing, analysis, message = null, offerPrice
           localMargin: analysis.local?.margin ?? null,
           registrationCost: f.registrationCost,
           transportCost: f.transportCost,
+          ownershipCost: f.ownership?.total ?? 0,
           reconditioning: COSTS.RECONDITIONING_BASE,
           score: analysis.score,
         };
@@ -520,7 +521,7 @@ export const isActionable = (action) => action.kind !== 'attendre' && action.kin
 // Actions (réducteur immuable)
 // ---------------------------------------------------------------------------
 
-const EDITABLE = new Set(['argusPrice', 'offerPrice', 'maxBuyPrice', 'walkAwayPrice', 'ownerNet', 'salePrice', 'purchasePrice', 'listedPrice', 'floorPrice', 'soldPrice', 'extraCosts', 'registrationCost', 'transportCost', 'reconditioning']);
+const EDITABLE = new Set(['ownershipCost', 'argusPrice', 'offerPrice', 'maxBuyPrice', 'walkAwayPrice', 'ownerNet', 'salePrice', 'purchasePrice', 'listedPrice', 'floorPrice', 'soldPrice', 'extraCosts', 'registrationCost', 'transportCost', 'reconditioning']);
 
 /**
  * @typedef {{ type: 'outbound', text: string, offer?: number }
@@ -635,7 +636,7 @@ export function dealEconomics(deal) {
     return { expected, realized, invested: 0 };
   }
   if (deal.kind === 'revente') return { expected: 0, realized: null, invested: 0 };
-  const costs = (n.reconditioning ?? COSTS.RECONDITIONING_BASE) + (n.registrationCost ?? 0) + (n.transportCost ?? 0) + (n.extraCosts ?? 0);
+  const costs = (n.reconditioning ?? COSTS.RECONDITIONING_BASE) + (n.registrationCost ?? 0) + (n.transportCost ?? 0) + (n.ownershipCost ?? 0) + (n.extraCosts ?? 0);
   const buy = n.purchasePrice ?? n.offerPrice ?? n.askingPrice ?? 0;
   const sell = n.soldPrice ?? n.listedPrice ?? n.marketPrice ?? 0;
   const expected = sell - buy - costs - (n.soldPrice ? 0 : COSTS.RISK_CAPITAL);

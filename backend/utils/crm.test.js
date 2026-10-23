@@ -135,7 +135,7 @@ describe('Pipeline & chaleur', () => {
     assert.equal(publish.offer, 9490);
     deal = run(deal, [{ type: 'stage', stage: 'vendu', amount: 9300 }, at(200)]);
     const money = dealEconomics(deal);
-    assert.equal(money.realized, 9300 - 6700 - 350 - 304);
+    assert.equal(money.realized, 9300 - 6700 - 500 - 304 - 260); // remise en état, carte grise, assurance + annonce
     assert.equal(nextAction(deal, at(201)).kind, 'aucune');
   });
 

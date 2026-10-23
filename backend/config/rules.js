@@ -14,12 +14,30 @@
 // ---------------------------------------------------------------------------
 
 export const COSTS = {
-  /** Frais de remise en état de base : detailing pro 80-90 € + petite méca. */
-  RECONDITIONING_BASE: 350,
+  /**
+   * Remise en état de base : detailing + petite méca. 500 € (au lieu de 350 €) : un négociant compte
+   * ~600 € + 120 € de préparation sur une 9 900 €, et les factures dépassent souvent le devis (README, Sources).
+   */
+  RECONDITIONING_BASE: 500,
   /** Capital risque systématique : imprévu ou négo de l'acheteur final. */
   RISK_CAPITAL: 200,
   /** Coût réel d'un detailing pro intérieur/extérieur. */
   DETAILING_REAL_COST: 80,
+};
+
+/**
+ * Frais de détention et de revente (en plus de la carte grise et du rapatriement) :
+ * - assurance temporaire le temps de garder la voiture : ~158-210 € les 30 jours, soit ~6 €/jour
+ *   (comparateurs d'assurance temporaire, 2026) ; durée = délai de vente du marché, entre 30 et 90 jours ;
+ * - annonce LeBonCoin : 2 annonces véhicule gratuites par an pour un particulier, puis 79,90 € l'annonce ;
+ * - déplacement pour voir / récupérer la voiture dans ta zone : aller-retour à 0,15 €/km.
+ */
+export const OWNERSHIP_COSTS = {
+  insurancePerDay: 6,
+  minHoldingDays: 30,
+  maxHoldingDays: 90,
+  adFee: 80,
+  visitPerKm: 0.15,
 };
 
 /** Plafond du cumul des options déclencheurs (règle d'or : ne jamais viser le haut du marché). */

@@ -143,20 +143,21 @@ describe('Zone & variantes (bugs vus en production)', () => {
 describe('Achat à distance', () => {
   it('déduit le rapatriement : une pépite à 500 km peut redevenir "à surveiller"', () => {
     const base = { ad_id: 8, price: 6990 };
-    // Carte grise Clio 2017 : 304 € (5 CV × 58 € + 13,76 €).
-    const near = { ...listing(base), marketPrice: 9104, zone: 'prioritaire', distanceKm: 40 };
-    const far = { ...listing(base), marketPrice: 9104, zone: 'france', distanceKm: 500 };
+    // Carte grise Clio 2017 304 € + assurance 30 j 180 € + annonce 80 € ; visite à 40 km : 10 €.
+    const near = { ...listing(base), marketPrice: 9534, zone: 'prioritaire', distanceKm: 40 };
+    const far = { ...listing(base), marketPrice: 9534, zone: 'france', distanceKm: 500 };
     const a = scoreListing(near, { now: NOW });
     const b = scoreListing(far, { now: NOW });
     assert.equal(a.finance.transportCost, 0);
-    assert.equal(a.status.key, 'PEPITE'); // 9104 - 6990 - 550 - 304 = 1260 > 1000
+    assert.equal(a.status.key, 'PEPITE'); // 9534 - 6990 - 700 - 574 = 1270 > 1000
+    assert.equal(a.finance.ownership.visit, 10);
     assert.equal(b.finance.transportCost, 140); // 60 + 500 × 0,15
     assert.equal(b.finance.netMargin, a.finance.netMargin, 'formule stricte inchangée');
-    assert.equal(b.finance.realNetMargin, 1120);
+    assert.equal(b.finance.realNetMargin, 1140); // 2544 - 700 - 304 - 260 - 140
     assert.equal(b.zone, 'france');
-    const veryFar = scoreListing({ ...far, distanceKm: 900 }, { now: NOW }); // 60 + 135 = 200 -> 1060
+    const veryFar = scoreListing({ ...far, distanceKm: 900 }, { now: NOW }); // 60 + 135 = 200 -> 1080
     assert.equal(veryFar.status.key, 'PEPITE');
-    const farther = scoreListing({ ...far, marketPrice: 9004, distanceKm: 900 }, { now: NOW }); // 1160 - 200 = 960
+    const farther = scoreListing({ ...far, marketPrice: 9434, distanceKm: 900 }, { now: NOW }); // 980
     assert.equal(farther.status.key, 'SURVEILLER');
   });
 
@@ -168,7 +169,7 @@ describe('Achat à distance', () => {
 
 describe('Pipeline de chasse', () => {
   it('cote, score et sélectionne une PÉPITE avec message de négo', () => {
-    const fresh = listing({ ad_id: 1, price: 6990 });
+    const fresh = listing({ ad_id: 1, price: 6500 });
     const pool = [fresh, ...comps([8700, 8900, 9000, 9100, 9300])];
     const { priced, unpriced } = priceListings([fresh], pool);
     assert.equal(unpriced, 0);
@@ -176,7 +177,7 @@ describe('Pipeline de chasse', () => {
     const alerts = selectAlerts(priced, { now: NOW });
     assert.equal(alerts.length, 1);
     assert.equal(alerts[0].payload.ok && alerts[0].payload.strategy, 'negotiation');
-    assert.equal(alerts[0].key, alertKey('lbc-1', 'negotiation', 6990));
+    assert.equal(alerts[0].key, alertKey('lbc-1', 'negotiation', 6500));
   });
 
   it('n’alerte pas sans cote ni sur une annonce sans marge', () => {
@@ -193,7 +194,7 @@ describe('Pipeline de chasse', () => {
 });
 
 describe('Telegram', () => {
-  const fresh = listing({ ad_id: 1, title: 'Clio <script> & co', price: 6990 });
+  const fresh = listing({ ad_id: 1, title: 'Clio <script> & co', price: 6500 });
   const [alert] = selectAlerts(priceListings([fresh], comps([8700, 8900, 9000, 9100, 9300])).priced, { now: NOW });
 
   it('formate une alerte HTML échappée et sous 4 096 caractères', () => {
@@ -377,11 +378,11 @@ describe('Revente chez toi', () => {
   });
 
   it('MASTERCLASS seulement si ta zone confirme', () => {
-    const base = { ...listing({ ad_id: 600, price: 5000 }), marketPrice: 8000, description: 'Vente urgente.' };
-    const ok = scoreListing({ ...base, localMarket: { price: 8200, low: 7900, high: 8500, comparables: 5, daysOnMarket: 20, radiusKm: 100 } }, { now: NOW });
+    const base = { ...listing({ ad_id: 600, price: 6000 }), marketPrice: 10000, description: 'Vente urgente.' };
+    const ok = scoreListing({ ...base, localMarket: { price: 10200, low: 9900, high: 10500, comparables: 5, daysOnMarket: 20, radiusKm: 100 } }, { now: NOW });
     assert.equal(ok.masterclass, true);
-    assert.equal(ok.local?.margin, 8200 - 5000 - 550 - 304);
-    const low = scoreListing({ ...base, localMarket: { price: 6200, low: 6000, high: 6400, comparables: 4, daysOnMarket: 40, radiusKm: 100 } }, { now: NOW });
+    assert.equal(ok.local?.margin, 10200 - 6000 - 700 - 304 - 260);
+    const low = scoreListing({ ...base, localMarket: { price: 7200, low: 7000, high: 7400, comparables: 4, daysOnMarket: 40, radiusKm: 100 } }, { now: NOW });
     assert.equal(low.masterclass, false);
     assert.ok(low.warnings.some((w) => w.includes('Chez toi')));
   });
