@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { adUrl } from '@/backend/utils/links.js';
 import { MandatePanel } from '@/components/mandate/MandatePanel';
 import { Chip } from '@/components/ui/Chip';
 import { ScoreGauge } from '@/components/ui/ScoreGauge';
@@ -37,6 +38,7 @@ export function ListingCard({
   const refused = analysis.blacklist.length > 0;
   const canOutreach = analysis.status.key === 'PEPITE' || (mode === 'mandate' && analysis.mandateEligible);
   const f = analysis.finance;
+  const url = adUrl(listing);
 
   const meta = [
     String(listing.year),
@@ -70,7 +72,13 @@ export function ListingCard({
             )}
           </div>
           <h3 className="mt-1.5 truncate text-[15px] font-semibold text-ink-900" title={listing.title}>
-            {listing.title}
+            {url ? (
+              <a href={url} target="_blank" rel="noreferrer" className="hover:underline">
+                {listing.title} ↗
+              </a>
+            ) : (
+              listing.title
+            )}
           </h3>
           <p className="truncate text-xs text-ink-500">
             {meta.join(' · ')}
@@ -175,6 +183,11 @@ export function ListingCard({
               {open ? 'Masquer le détail' : mode === 'mandate' ? 'Détail du mandat' : 'Détail du calcul'}
             </button>
             <div className="ml-auto flex flex-wrap justify-end gap-2">
+              {url && (
+                <a className="btn-secondary text-xs" href={url} target="_blank" rel="noreferrer">
+                  Voir l’annonce ↗
+                </a>
+              )}
               {crm && !refused && (
                 <button
                   type="button"

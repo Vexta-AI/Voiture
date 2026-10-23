@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { adUrl } from '@/backend/utils/links.js';
 import { Chip } from '@/components/ui/Chip';
 import { eur, km } from '@/lib/format';
 import type { Listing } from '@/lib/types';
@@ -43,8 +44,8 @@ export function PendingCard({ listing, onPrice }: { listing: Listing; onPrice: (
         <button type="submit" className="btn-secondary text-xs" disabled={!(value > 0)}>
           Scorer
         </button>
-        {listing.url && (
-          <a className="btn-ghost ml-auto px-2 text-xs" href={listing.url} target="_blank" rel="noreferrer">
+        {adUrl(listing) && (
+          <a className="btn-ghost ml-auto px-2 text-xs" href={adUrl(listing) ?? undefined} target="_blank" rel="noreferrer">
             Annonce ↗
           </a>
         )}

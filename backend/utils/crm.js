@@ -11,6 +11,7 @@
 
 import { DOCUMENTS, FOLLOW_UP, HEAT, PIPELINES, RESALE } from '../config/crm.js';
 import { COSTS, MANDATE, REGISTRATION } from '../config/rules.js';
+import { adUrl } from './links.js';
 import { clamp, normalize } from './text.js';
 
 const DAY_MS = 86_400_000;
@@ -97,7 +98,7 @@ export function createDeal({ kind, listing, analysis, message = null, offerPrice
       year: listing.year,
       mileage: listing.mileage,
       location: listing.location ?? null,
-      url: listing.url ?? null,
+      url: adUrl(listing),
       zone: analysis.zone ?? null,
       distanceKm: analysis.distanceKm ?? null,
       areaType: analysis.areaType ?? null,

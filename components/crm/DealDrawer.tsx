@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { DOCUMENTS, LOST_REASONS, PIPELINES } from '@/backend/config/crm.js';
 import { dealEconomics, leadHeat, listedPriceOf, nextAction } from '@/backend/utils/crm.js';
+import { adUrl } from '@/backend/utils/links.js';
 import { Chip } from '@/components/ui/Chip';
 import { Modal } from '@/components/ui/Modal';
 import type { Deal } from '@/lib/crm';
@@ -75,6 +76,7 @@ function DealPanel({ deal, deals, now, onAct, onAddBuyer, onOpen, onDelete }: Pr
   const [saving, setSaving] = useState(false);
 
   const heat = leadHeat(deal, now);
+  const vehicleUrl = adUrl({ ...deal.vehicle, id: deal.vehicle.listingId });
   const action = nextAction(deal, now);
   const money = dealEconomics(deal);
   const stages = PIPELINES[deal.kind].stages;
@@ -99,8 +101,8 @@ function DealPanel({ deal, deals, now, onAct, onAddBuyer, onOpen, onDelete }: Pr
           <Chip tone={KIND_TONE[deal.kind]}>{KIND_LABEL[deal.kind]}</Chip>
           {deal.vehicle.areaType === 'campagne' && <Chip tone="green">🌾 Campagne</Chip>}
           {deal.vehicle.distanceKm !== null && deal.vehicle.distanceKm !== undefined && <Chip>{deal.vehicle.distanceKm} km</Chip>}
-          {deal.vehicle.url && (
-            <a className="text-xs font-medium text-sky-700 underline dark:text-sky-400" href={deal.vehicle.url} target="_blank" rel="noreferrer">
+          {vehicleUrl && (
+            <a className="text-xs font-medium text-sky-700 underline dark:text-sky-400" href={vehicleUrl} target="_blank" rel="noreferrer">
               Annonce ↗
             </a>
           )}

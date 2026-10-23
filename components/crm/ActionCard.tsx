@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import type { leadHeat, nextAction } from '@/backend/utils/crm.js';
 import { LOST_REASONS } from '@/backend/config/crm.js';
+import { adUrl } from '@/backend/utils/links.js';
 import { Chip } from '@/components/ui/Chip';
 import type { Deal } from '@/lib/crm';
 import { cn, eur } from '@/lib/format';
@@ -62,6 +63,7 @@ export function ActionCard({ deal, action, heat, onAct, onOpen }: { deal: Deal; 
   const [pending, setPending] = useState(false);
   const lastIn = [...deal.events].reverse().find((e) => e.type === 'in');
   const party = deal.kind === 'revente' ? "l'acheteur" : 'le vendeur';
+  const vehicleUrl = adUrl({ ...deal.vehicle, id: deal.vehicle.listingId });
 
   const run = async (body: DealActionBody) => {
     setPending(true);
@@ -84,7 +86,13 @@ export function ActionCard({ deal, action, heat, onAct, onOpen }: { deal: Deal; 
             {deal.source === 'radar' && <Chip>Radar</Chip>}
           </div>
           <h3 className="mt-1.5 truncate text-[15px] font-semibold text-ink-900" title={deal.vehicle.title}>
-            {deal.vehicle.title}
+            {vehicleUrl ? (
+              <a href={vehicleUrl} target="_blank" rel="noreferrer" className="hover:underline">
+                {deal.vehicle.title} ↗
+              </a>
+            ) : (
+              deal.vehicle.title
+            )}
           </h3>
           <p className="truncate text-xs text-ink-500">
             {deal.vehicle.year} · {Number(deal.vehicle.mileage).toLocaleString('fr-FR')} km
@@ -163,8 +171,8 @@ export function ActionCard({ deal, action, heat, onAct, onOpen }: { deal: Deal; 
             Papiers & date
           </button>
         )}
-        {deal.vehicle.url && (
-          <a className="btn-ghost text-xs" href={deal.vehicle.url} target="_blank" rel="noreferrer">
+        {vehicleUrl && (
+          <a className="btn-secondary text-xs" href={vehicleUrl} target="_blank" rel="noreferrer">
             Ouvrir l’annonce ↗
           </a>
         )}

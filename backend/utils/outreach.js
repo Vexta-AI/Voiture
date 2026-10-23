@@ -11,6 +11,7 @@
  * (marge nette négociée vs revenu du mandat ; à égalité, le mandat : zéro trésorerie).
  */
 
+import { adUrl } from './links.js';
 import { generateMandateMessage, generateNegotiationMessage } from './messages.js';
 
 export const OUTREACH_VERSION = 1;
@@ -104,7 +105,7 @@ export function buildOutreachPayload(listing, analysis, options = {}) {
       daysOnline: analysis.daysOnline,
       location: listing.location ?? null,
       source: listing.source ?? null,
-      url: listing.url ?? null,
+      url: adUrl(listing),
     },
     scoring: {
       status: analysis.status.key,
