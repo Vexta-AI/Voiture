@@ -37,6 +37,10 @@ export const HUNT_LIMITS = {
   marketWeekday: 1,
   /** Durée de conservation des runs en stock (jours). */
   retentionDays: 90,
+  /** Recherches de comparables à la demande par run frais (plan gratuit : rester sobre). */
+  ondemandPerRun: 2,
+  /** Un modèle déjà recherché à la demande n'est pas relancé avant ce délai. */
+  ondemandCooldownDays: 14,
 };
 
 /** Mots-clés des recherches de comparables, un par modèle ciblé. */
@@ -162,6 +166,27 @@ export function defaultSources(options = {}) {
     }
   }
   return sources;
+}
+
+/** Préfixe des recherches de comparables lancées à la demande (modèle vu sans cote). */
+export const ONDEMAND_PREFIX = 'ondemand-';
+
+/**
+ * Recherche de comparables pour un modèle précis, France entière : lancée quand une annonce fraîche
+ * n'a pas assez de comparables pour être cotée.
+ * @param {{ type: 'auto'|'moto', brand: string, model: string }} listing
+ * @param {{ maxItems?: number }} [options]
+ * @returns {HuntSource}
+ */
+export function ondemandSource(listing, options = {}) {
+  const searchText = `${listing.brand} ${listing.model}`.toLowerCase().replace(/\s+/g, ' ').trim();
+  const { min, max } = BUDGETS[listing.type];
+  return {
+    key: `${ONDEMAND_PREFIX}${listing.type}-${searchText.replace(/[^a-z0-9]+/gi, '-')}`.slice(0, 64),
+    kind: 'market',
+    type: listing.type,
+    input: { searchText, category: LBC_CATEGORY[listing.type], priceMin: Math.round(min * 0.6), priceMax: Math.round(max * 1.3), maxItems: options.maxItems ?? HUNT_LIMITS.marketMaxItems },
+  };
 }
 
 /** Input complet envoyé au scraper (proxy résidentiel FR obligatoire pour LeBonCoin). */

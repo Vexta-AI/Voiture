@@ -3,17 +3,32 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 
 import { getDatasetItems, getRun, isCapacityError, startRun } from '@/backend/pipeline/apify.js';
-import { priceListings, selectAlerts } from '@/backend/pipeline/hunt.js';
+import { ondemandCandidates, priceListings, selectAlerts } from '@/backend/pipeline/hunt.js';
 import { filterArea } from '@/backend/pipeline/geo.js';
 import { dedupeById } from '@/backend/pipeline/market.js';
 import { normalizeApifyItem } from '@/backend/pipeline/normalize.js';
 import { formatTelegramAlert, sendTelegram } from '@/backend/pipeline/telegram.js';
 import { dailyDigest } from '@/backend/utils/crm.js';
-import { DEFAULT_AREA, HUNT_LIMITS, defaultSources, parseArea, parseTypes, type HuntSource } from '@/backend/config/sources.js';
+import { DEFAULT_AREA, HUNT_LIMITS, ONDEMAND_PREFIX, defaultSources, parseArea, parseTypes, type HuntSource } from '@/backend/config/sources.js';
+import { modelKey } from '@/backend/pipeline/market.js';
 
 import { dealFromListing } from './crm-deals';
 import { createDealOnce, loadDeals } from './crm-store';
-import { alertAlreadySent, claimSource, loadBatch, loadRuns, markAlertSent, pruneRuns, releaseSource, saveBatch, saveRun, storeEnabled } from './store';
+import {
+  alertAlreadySent,
+  claimSource,
+  loadBatch,
+  loadOndemand,
+  loadRuns,
+  markAlertSent,
+  markOndemand,
+  pruneRuns,
+  recentOndemandKeys,
+  releaseSource,
+  saveBatch,
+  saveRun,
+  storeEnabled,
+} from './store';
 import type { Listing } from './types';
 
 /** Configuration lue dans les variables d'environnement Vercel. */
@@ -143,40 +158,8 @@ export async function continueBatch(batchId: string) {
   return launchFromBatch(huntConfig(), batchId, batch.keys, 1);
 }
 
-/** Traite un run Apify terminé : stockage, cote, scoring, alertes Telegram. */
-export async function ingestRun(runId: string, sourceKey: string) {
-  const config = huntConfig();
-  const source = resolveSources(config, true).find((s) => s.key === sourceKey);
-  if (!source) return { ok: false as const, error: 'unknown_source' };
-
-  const run = await getRun({ token: config.apifyToken, runId });
-  if (run.status !== 'SUCCEEDED') return { ok: false as const, error: 'run_not_succeeded', status: run.status };
-
-  const items: Record<string, unknown>[] = await getDatasetItems({ token: config.apifyToken, datasetId: run.datasetId });
-  const listings: Listing[] = [];
-  let rejected = 0;
-  for (const item of items) {
-    const result = normalizeApifyItem(item, { type: source.type, source: source.key });
-    if (result.ok) listings.push(result.listing as Listing);
-    else rejected += 1;
-  }
-
-  const fetchedAt = new Date().toISOString();
-  await saveRun({ runId, source: source.key, kind: source.kind, type: source.type, fetchedAt, listings, rejected });
-
-  const summary = { ok: true as const, source: source.key, kind: source.kind, items: items.length, listings: listings.length, rejected, priced: 0, unpriced: 0, alerts: 0, skippedDuplicates: 0, alertErrors: 0, crmCreated: 0 };
-  if (source.kind === 'market') return summary;
-
-  // Le scraper n'applique pas toujours le rayon : seules les annonces vérifiées dans la zone sont chassées
-  // (toutes restent dans le stock de comparables).
-  // Mandat (stale) : zone prioritaire uniquement ; achat-revente : France entière, zone prioritaire d'abord.
-  const { kept, stats } = filterArea(listings, config.area ?? DEFAULT_AREA, { national: source.kind !== 'stale' });
-  Object.assign(summary, { area: stats });
-  const pool = dedupeById((await loadRuns(HUNT_LIMITS.retentionDays)).flatMap((r) => r.listings));
-  const { priced, unpriced } = priceListings(kept, pool);
-  summary.priced = priced.length;
-  summary.unpriced = unpriced;
-
+/** Envoie les alertes (Telegram) et crée les deals CRM d'annonces cotées. */
+async function alertOn(config: Config, priced: ReturnType<typeof priceListings>['priced'], summary: { alerts: number; skippedDuplicates: number; alertErrors: number; crmCreated: number }) {
   for (const alert of selectAlerts(priced)) {
     if (!alert.payload.ok) continue;
     // CRM : chaque pépite / cible mandat entre dans le pipeline avec son premier message prêt.
@@ -204,6 +187,111 @@ export async function ingestRun(runId: string, sourceKey: string) {
       summary.alertErrors += 1;
     }
   }
+}
+
+/**
+ * Annonces sans cote : lance une recherche de comparables pour leur modèle (France entière),
+ * hors webhook de lot. Plafonnée par run et relancée au plus tous les 14 jours par modèle.
+ */
+async function launchOndemand(config: Config, missing: Listing[]) {
+  const max = Number(process.env.HUNT_ONDEMAND_PER_RUN ?? HUNT_LIMITS.ondemandPerRun);
+  if (!(max > 0) || missing.length === 0) return [];
+  const sources = ondemandCandidates(missing, { max, skip: await recentOndemandKeys(HUNT_LIMITS.ondemandCooldownDays) });
+  const launched: string[] = [];
+  for (const source of sources) {
+    try {
+      await startRun({
+        token: config.apifyToken,
+        source,
+        webhookUrl: `${config.appUrl}/api/hunt/ingest`,
+        webhookSecret: config.ingestSecret,
+        maxChargeUsd: config.maxChargeUsd,
+        bypassSecret: config.bypassSecret,
+      });
+      await markOndemand(source);
+      launched.push(source.key);
+    } catch (error) {
+      // Plus de créneau Apify : les modèles restants seront recherchés au prochain run.
+      if (isCapacityError(error)) break;
+      console.error('[hunt] ondemand', source.key, error);
+    }
+  }
+  return launched;
+}
+
+/** Source d'un run : lot du jour, ou recherche de comparables à la demande. */
+async function sourceByKey(config: Config, key: string): Promise<HuntSource | undefined> {
+  if (key.startsWith(ONDEMAND_PREFIX)) return (await loadOndemand<HuntSource>(key)) ?? undefined;
+  return resolveSources(config, true).find((s) => s.key === key);
+}
+
+/** Traite un run Apify terminé : stockage, cote, scoring, alertes Telegram, comparables manquants. */
+export async function ingestRun(runId: string, sourceKey: string) {
+  const config = huntConfig();
+  const source = await sourceByKey(config, sourceKey);
+  if (!source) return { ok: false as const, error: 'unknown_source' };
+
+  const run = await getRun({ token: config.apifyToken, runId });
+  if (run.status !== 'SUCCEEDED') return { ok: false as const, error: 'run_not_succeeded', status: run.status };
+
+  const items: Record<string, unknown>[] = await getDatasetItems({ token: config.apifyToken, datasetId: run.datasetId });
+  const listings: Listing[] = [];
+  let rejected = 0;
+  for (const item of items) {
+    const result = normalizeApifyItem(item, { type: source.type, source: source.key });
+    if (result.ok) listings.push(result.listing as Listing);
+    else rejected += 1;
+  }
+
+  const fetchedAt = new Date().toISOString();
+  await saveRun({ runId, source: source.key, kind: source.kind, type: source.type, fetchedAt, listings, rejected });
+
+  const summary = {
+    ok: true as const,
+    source: source.key,
+    kind: source.kind,
+    items: items.length,
+    listings: listings.length,
+    rejected,
+    priced: 0,
+    unpriced: 0,
+    alerts: 0,
+    skippedDuplicates: 0,
+    alertErrors: 0,
+    crmCreated: 0,
+    ondemand: [] as string[],
+  };
+  const area = config.area ?? DEFAULT_AREA;
+  const pool = () => loadRuns(HUNT_LIMITS.retentionDays).then((runs) => ({ runs, pool: dedupeById(runs.flatMap((r) => r.listings)) }));
+
+  if (source.kind === 'market') {
+    if (!source.key.startsWith(ONDEMAND_PREFIX) || listings.length === 0) return summary;
+    // Comparables arrivés : on recote les annonces fraîches de ces modèles restées sans cote, et on alerte.
+    const keys = new Set(listings.map((l) => modelKey(l)));
+    const { runs, pool: stock } = await pool();
+    const since = Date.now() - 3 * 86_400_000;
+    const waiting = dedupeById(runs.filter((r) => r.kind === 'fresh' && new Date(r.fetchedAt).getTime() >= since).flatMap((r) => r.listings)).filter((l) => keys.has(modelKey(l)));
+    const { priced, unpriced } = priceListings(filterArea(waiting, area, { national: true }).kept, stock);
+    summary.priced = priced.length;
+    summary.unpriced = unpriced;
+    await alertOn(config, priced, summary);
+    return summary;
+  }
+
+  // Le scraper n'applique pas toujours le rayon : seules les annonces vérifiées dans la zone sont chassées
+  // (toutes restent dans le stock de comparables).
+  // Mandat (stale) : zone prioritaire uniquement ; achat-revente : France entière, zone prioritaire d'abord.
+  const { kept, stats } = filterArea(listings, area, { national: source.kind !== 'stale' });
+  Object.assign(summary, { area: stats });
+  const { pool: stock } = await pool();
+  const { priced, unpriced, missing } = priceListings(kept, stock);
+  summary.priced = priced.length;
+  summary.unpriced = unpriced;
+  await alertOn(config, priced, summary);
+  summary.ondemand = await launchOndemand(config, missing as Listing[]).catch((error) => {
+    console.error('[hunt] ondemand', error);
+    return [];
+  });
   return summary;
 }
 
@@ -215,9 +303,13 @@ async function computeLive() {
   const recentSince = Date.now() - 3 * 86_400_000;
   const recentAll = dedupeById(runs.filter((r) => r.kind !== 'market' && new Date(r.fetchedAt).getTime() >= recentSince).flatMap((r) => r.listings));
   const recent = filterArea(recentAll, huntConfig().area ?? DEFAULT_AREA).kept;
-  const { priced, unpriced } = priceListings(recent, pool);
+  const { priced, unpriced, missing } = priceListings(recent, pool);
   const lastRun = runs.filter((r) => r.kind !== 'market').at(-1)?.fetchedAt ?? null;
-  return { listings: priced.map((p) => p.listing as Listing), unpriced, poolSize: pool.length, lastRun };
+  // Annonces réelles encore sans cote : affichées à part (cote à saisir), zone prioritaire d'abord.
+  const pending = (missing as Listing[])
+    .sort((a, b) => (a.zone === 'france' ? 1 : 0) - (b.zone === 'france' ? 1 : 0) || (a.distanceKm ?? 0) - (b.distanceKm ?? 0))
+    .slice(0, 120);
+  return { listings: priced.map((p) => p.listing as Listing), pending, unpriced, poolSize: pool.length, lastRun };
 }
 
 /** Annonces réelles pour le dashboard (cache 5 min par instance). */

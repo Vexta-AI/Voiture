@@ -3,6 +3,8 @@
  *   annonces normalisées -> cote par comparables -> scoring -> outreach -> alertes à envoyer.
  */
 
+import { BUDGETS } from '../config/rules.js';
+import { ondemandSource } from '../config/sources.js';
 import { buildOutreachPayload } from '../utils/outreach.js';
 import { scoreListing } from '../utils/scoring.js';
 import { MARKET_RULES, estimateMarketPrice } from './market.js';
@@ -17,16 +19,35 @@ export const MAX_ALERTS_PER_RUN = 10;
  */
 export function priceListings(listings, pool) {
   const priced = [];
-  let unpriced = 0;
+  const missing = [];
   for (const listing of listings) {
     const market = estimateMarketPrice(listing, pool);
     if (!market) {
-      unpriced += 1;
+      missing.push(listing);
       continue;
     }
     priced.push({ listing: { ...listing, marketPrice: market.price }, market });
   }
-  return { priced, unpriced };
+  return { priced, unpriced: missing.length, missing };
+}
+
+/**
+ * Modèles à faire coter en priorité parmi les annonces sans cote : dans le budget, zone prioritaire
+ * et plus proches d'abord, une recherche par modèle, les modèles déjà recherchés récemment exclus.
+ * @param {import('../utils/scoring.js').Listing[]} missing
+ * @param {{ max: number, skip?: Set<string> }} options skip : clés de sources déjà lancées
+ */
+export function ondemandCandidates(missing, { max, skip = new Set() }) {
+  const inBudget = (l) => l.price >= BUDGETS[l.type].min && l.price <= BUDGETS[l.type].max;
+  const sorted = missing.filter(inBudget).sort((a, b) => (a.zone === 'france' ? 1 : 0) - (b.zone === 'france' ? 1 : 0) || (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
+  const picked = new Map();
+  for (const listing of sorted) {
+    const source = ondemandSource(listing);
+    if (picked.size >= max) break;
+    if (skip.has(source.key) || picked.has(source.key)) continue;
+    picked.set(source.key, source);
+  }
+  return [...picked.values()];
 }
 
 /** Clé anti-doublon : une nouvelle alerte part si la stratégie ou le prix change (baisse de prix). */
