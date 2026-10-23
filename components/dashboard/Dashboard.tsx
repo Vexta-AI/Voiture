@@ -309,7 +309,7 @@ export function Dashboard({ initialListings, pending = [], radar }: { initialLis
         )}
 
         <footer className="pt-4 text-center text-xs text-ink-400">
-          Marge réelle = Cote pro − Prix affiché − 350 € remise en état − 200 € capital risque − carte grise − rapatriement (hors zone). Règle d’or : viser la moyenne du
+          Marge réelle = Prix marché (médiane des annonces comparables) − Prix affiché − 350 € remise en état − 200 € capital risque − carte grise − rapatriement (hors zone). Règle d’or : viser la moyenne du
           marché, jamais le prix le plus haut.
         </footer>
       </main>

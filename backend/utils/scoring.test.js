@@ -383,9 +383,24 @@ describe('Points forts & marché', () => {
   });
 
   it('marché lent et cote Argus en aide à la décision', () => {
-    const a = score({ marketStats: { low: 6500, high: 7400, comparables: 9, daysOnMarket: 60 }, argusPrice: 7600 });
+    const a = score({ marketStats: { low: 6500, high: 7400, comparables: 9, daysOnMarket: 100 }, argusPrice: 7600 });
     assert.ok(a.insights.some((i) => i.includes('Marché lent')));
     assert.ok(a.insights.some((i) => i.includes('Cote Argus')));
     assert.equal(a.market?.argus, 7600);
+  });
+});
+
+describe('Réalité du marché', () => {
+  it('marge prudente = marge réelle − ~5 % de négo de ton acheteur', () => {
+    const a = score({ price: 6000, marketPrice: 9000 });
+    assert.equal(a.prudent.buyerDiscount, 450);
+    assert.equal(a.prudent.margin, a.finance.realNetMargin - 450);
+  });
+
+  it('marché lent au-delà de 90 j (moyenne leboncoin), 145 j en électrique', () => {
+    const stats = (d) => ({ marketStats: { low: 1, high: 2, comparables: 5, daysOnMarket: d } });
+    assert.ok(!score(stats(60)).insights.some((i) => i.startsWith('Marché lent')));
+    assert.ok(score(stats(95)).insights.some((i) => i.startsWith('Marché lent')));
+    assert.ok(!score({ ...stats(120), title: 'Renault Zoe électrique' }).insights.some((i) => i.startsWith('Marché lent')));
   });
 });

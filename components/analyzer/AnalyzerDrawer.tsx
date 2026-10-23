@@ -118,7 +118,7 @@ export function AnalyzerDrawer({ open, onClose, onAdd }: { open: boolean; onClos
           <Field label="Prix affiché (€) *">
             <input className="input" inputMode="numeric" value={form.price} onChange={set('price')} placeholder="6990" required />
           </Field>
-          <Field label="Cote marché pro (€) *">
+          <Field label="Prix marché / cote (€) *">
             <input className="input" inputMode="numeric" value={form.marketPrice} onChange={set('marketPrice')} placeholder="8900" required />
           </Field>
           <Field label="Jours en ligne">

@@ -203,7 +203,7 @@ describe('Telegram', () => {
     assert.match(text, /PÉPITE/);
     assert.match(text, /&lt;script&gt; &amp; co/);
     assert.doesNotMatch(text, /<script>/);
-    assert.match(text, /5 comparables/);
+    assert.match(text, /médiane de 5 annonces/);
     assert.ok(text.length <= 4096);
   });
 

@@ -117,6 +117,7 @@ export function buildOutreachPayload(listing, analysis, options = {}) {
       netMargin: analysis.finance.netMargin,
       realNetMargin: analysis.finance.realNetMargin,
       masterclass: analysis.masterclass,
+      prudentMargin: analysis.prudent.margin,
       localResale: analysis.local ? { price: analysis.local.price, margin: analysis.local.margin, comparables: analysis.local.comparables, radiusKm: analysis.local.radiusKm } : null,
       reasons: analysis.priceReasons.reasons,
       registrationCost: analysis.finance.registrationCost,

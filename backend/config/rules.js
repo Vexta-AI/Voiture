@@ -282,6 +282,22 @@ export const BLACKLIST_KEYWORDS = [
 ];
 
 /**
+ * RÉALITÉ DU MARCHÉ (sources dans le README, section « Sources & hypothèses »).
+ * - Le prix marché du radar = médiane des PRIX AFFICHÉS des annonces comparables, pas un prix de vente
+ *   réel ni l'Argus. À la revente, ton acheteur négociera aussi : 3 à 8 % selon les guides du secteur.
+ * - Délai de vente : ~90-95 jours en moyenne sur leboncoin (thermique), ~145 jours en électrique (L'argus, 2025).
+ */
+export const MARKET_TRUTH = {
+  /** Négo de ton acheteur à la revente, déduite dans la « marge prudente ». */
+  buyerDiscountRate: 0.05,
+  /** Au-delà : marché lent (plus lent que la moyenne leboncoin). */
+  slowDays: 90,
+  /** Électrique : délai moyen nettement plus long. */
+  evSlowDays: 145,
+  evPattern: /electrique|\bev\b|e-tech electrique|\bzoe\b|tesla|e-208|e-2008|\bid\.?[34]\b|e-c4|ioniq|kona electrique|leaf|\bmg4\b/,
+};
+
+/**
  * POURQUOI CE PRIX ? Ce que dit l'annonce sur un prix sous la cote.
  * motivated : vendeur pressé, la bonne affaire est réelle (et la négo facile).
  * risks : le prix bas cache un problème -> jamais de MASTERCLASS, vérifier avant de bouger.
@@ -304,7 +320,7 @@ export const PRICE_SIGNALS = {
     { id: 'ct', label: 'CT à faire / défaillances', pattern: /(ct|controle technique) (a faire|a passer|pas fait|non fait|expire)|defaillances? (majeures?|critiques?)/ },
     { id: 'compteur', label: 'Kilométrage douteux', pattern: /compteur (change|remplace|non d'?origine)|kilometrage (non garanti|incertain|non certifie)/ },
   ],
-  /** Kilométrage annuel au-delà duquel un prix bas s'explique (usure). */
+  /** Kilométrage annuel au-delà duquel un prix bas s'explique (usure) : ~2 x la moyenne française (11 600 km/an en 2024, SDES). */
   highMileagePerYear: 25000,
   /** Décote vs cote à partir de laquelle on parle d'une vraie affaire. */
   bigGapRate: 0.15,
