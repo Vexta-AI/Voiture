@@ -20,6 +20,7 @@ import {
   BLACKLIST,
   BLACKLIST_KEYWORDS,
   BUDGETS,
+  BUSINESS,
   COSTS,
   DOORS_RULE,
   LOGISTICS,
@@ -344,6 +345,8 @@ export function computeMandate(listing) {
   const upsells = MANDATE.upsells.map((u) => ({ ...u, margin: u.price - u.cost }));
   const upsellMargin = upsells.reduce((sum, u) => sum + u.margin, 0);
   const upsellBilled = upsells.reduce((sum, u) => sum + u.price, 0);
+  // Micro : cotisations sur ce que tu factures (commission + upsells), au taux des prestations commerciales.
+  const socialCharges = BUSINESS.status === 'micro' ? Math.round((commission + upsellBilled) * BUSINESS.servicesSocialRate) : 0;
   return {
     salePrice,
     ownerNet,
@@ -352,7 +355,10 @@ export function computeMandate(listing) {
     upsells,
     upsellMargin,
     upsellBilled,
-    totalRevenue: commission + upsellMargin,
+    socialCharges,
+    grossRevenue: commission + upsellMargin,
+    /** Ce qui te reste : commission + marge des upsells − cotisations micro. */
+    totalRevenue: commission + upsellMargin - socialCharges,
     /** 0 = le propriétaire touche son prix affiché ; négatif = prix net à négocier sous l'annonce. */
     ownerGainVsAd: ownerNet - listing.price,
     cashRequired: 0,
@@ -499,7 +505,9 @@ export function scoreListing(listing, options = {}) {
   const registration = registrationCost(listing, segment, now);
   const registrationFee = registration.cost;
   const ownership = ownershipCosts(listing, geo);
-  const purchaseCosts = geo.transportCost + registrationFee + ownership.total;
+  // Micro : 12,3 % du prix de revente part en cotisations (calculées sur le CA, pas sur la marge).
+  const socialCharges = BUSINESS.status === 'micro' ? Math.round(marketPrice * BUSINESS.salesSocialRate) : 0;
+  const purchaseCosts = geo.transportCost + registrationFee + ownership.total + socialCharges;
   /** Ce qui reste vraiment dans la poche : la base du statut PÉPITE. */
   const realNetMargin = netMargin - purchaseCosts;
 
@@ -668,6 +676,7 @@ export function scoreListing(listing, options = {}) {
       transportCost: geo.transportCost,
       registrationCost: registrationFee,
       ownership,
+      socialCharges,
       registration,
       realNetMargin,
       reconditioning: COSTS.RECONDITIONING_BASE,

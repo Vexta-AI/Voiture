@@ -39,6 +39,9 @@ export function MarginBreakdown({ analysis }: { analysis: Analysis }) {
         )}
         <Row label="Assurance temporaire" value={`− ${eur(f.ownership.insurance)}`} muted hint={`${f.ownership.holdingDays} j à ~6 €/j, le temps de revendre`} />
         <Row label="Annonce LeBonCoin" value={`− ${eur(f.ownership.adFee)}`} muted hint="79,90 € dès la 3e annonce véhicule de l'année" />
+        {f.socialCharges > 0 && (
+          <Row label="Cotisations micro" value={`− ${eur(f.socialCharges)}`} muted hint="12,3 % du prix de revente (URSSAF, sur le CA)" />
+        )}
         {f.ownership.visit > 0 && <Row label="Déplacement" value={`− ${eur(f.ownership.visit)}`} muted hint={`aller-retour ${analysis.distanceKm} km`} />}
         <div className="mt-1 border-t border-ink-100 pt-1">
           <Row label="Marge réelle (dans ta poche)" value={signedEur(f.realNetMargin)} strong />
@@ -58,7 +61,7 @@ export function MarginBreakdown({ analysis }: { analysis: Analysis }) {
         <Row label="Leviers de négo" value={f.leversTotal ? `− ${eur(f.leversTotal)}` : '—'} muted />
         <Row label="Prix d'achat cible" value={eur(f.targetPrice)} />
         <Row label="Coût réel des défauts" value={f.leversRealCost ? `− ${eur(f.leversRealCost)}` : '—'} muted />
-        <Row label="Carte grise, assurance, annonce, trajet" value={`− ${eur(f.transportCost + f.registrationCost + f.ownership.total)}`} muted />
+        <Row label="Carte grise, assurance, annonce, trajet, cotisations" value={`− ${eur(f.transportCost + f.registrationCost + f.ownership.total + f.socialCharges)}`} muted />
         <div className="mt-1 border-t border-ink-100 pt-1">
           <Row label="Marge nette négociée" value={signedEur(f.negotiatedNetMargin)} strong />
         </div>

@@ -71,6 +71,7 @@ Une seule source de vérité : modifier une valeur dans `backend/config/rules.js
 | Remise en état | − 500 € (detailing + petite méca ; relevé de 350 € d'après les négociants, voir Sources) |
 | Capital risque | − 200 € systématiques |
 | **Marge nette** | Marge brute − 700 € |
+| Cotisations micro | − 12,3 % du prix de revente (sur le CA, statut `micro`) |
 | Assurance temporaire | − ~6 €/jour pendant le délai de vente du marché (30 à 90 jours) |
 | Annonce LeBonCoin | − 80 € (2 annonces véhicule gratuites par an, puis 79,90 €) |
 | Déplacement | − aller-retour à 0,15 €/km dans ta zone (hors zone : rapatriement) |
@@ -189,6 +190,7 @@ Chaque chiffre du radar est soit **sourcé**, soit **un choix métier signalé c
 | Gros rouleur | > 25 000 km/an | Moyenne française 11 600 km/an en 2024 ([SDES](https://www.statistiques.developpement-durable.gouv.fr/397-millions-de-voitures-en-circulation-en-france-au-1er-janvier-2025)) | Seuil ≈ 2× la moyenne |
 | Carte grise | 58 €/CV Nouvelle-Aquitaine, ÷ 2 après 10 ans, + 13,76 € | Tarif au 1er mars 2026 ([Cartegriseminute](https://www.cartegriseminute.fr/nouveau-prix-cheval-fiscal-nouvelle-aquitaine-2026.php)) | Sourcé ; CV estimés si absents (signalé « estimés ») |
 | Malus | non appliqué | Uniquement à la 1re immatriculation en France (import) ([Journal de l'Auto](https://journalauto.com/industrie/malus-pour-les-voitures-doccasion-seuls-les-modeles-importes-sont-concernes/)) | Sourcé |
+| Cotisations micro-entreprise | 12,3 % du prix de revente (achat-revente) ; 21,2 % de la commission + upsells (mandat) | Taux 2026 sur le **chiffre d'affaires** encaissé ([economie.gouv.fr](https://www.economie.gouv.fr/entreprises/micro-entreprise-auto-entreprise-charges-sociales)) | Sourcé ; `BUSINESS.status` dans `rules.js` |
 | TVA en pro | non déduite | Franchise en base : 85 000 € de CA en vente de marchandises en 2026 ([Legifiscal](https://www.legifiscal.fr/actualites-fiscales/4436-nouveaux-seuils-micro-entreprises-annee-2026.html)) ; au-delà, TVA sur la marge (art. 297 A du CGI) | À valider avec un comptable avant de passer pro |
 | Bonus campagne, points forts, MASTERCLASS | +5 / +2 par point / ×2 seuil | Choix métier pour trier (ne changent jamais la marge) | Choix métier |
 

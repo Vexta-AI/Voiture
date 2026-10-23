@@ -27,6 +27,14 @@ export function MandatePanel({ analysis }: { analysis: Analysis }) {
             <span className="tabular">{signedEur(u.margin)}</span>
           </div>
         ))}
+        {m.socialCharges > 0 && (
+          <div className="flex justify-between text-ink-600">
+            <span>
+              Cotisations micro <span className="text-xs text-ink-400">(21,2 % de ce que tu factures)</span>
+            </span>
+            <span className="tabular">− {eur(m.socialCharges)}</span>
+          </div>
+        )}
         <div className="flex justify-between border-t border-ink-100 pt-1 font-semibold">
           <span>Revenu net du mandat</span>
           <span className="tabular text-emerald-700 dark:text-emerald-300">{eur(m.totalRevenue)}</span>
