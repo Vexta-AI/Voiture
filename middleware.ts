@@ -41,5 +41,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api/hunt/|_next/static|_next/image|favicon.ico|icon).*)'],
+  // /cherche et /api/public/ : formulaire public « Je cherche une voiture » (acheteurs qui laissent leurs critères).
+  matcher: ['/((?!api/hunt/|api/public/|cherche|_next/static|_next/image|favicon.ico|icon).*)'],
 };

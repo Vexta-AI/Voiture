@@ -472,3 +472,19 @@ describe('Baisses de prix', () => {
     assert.match(msg.text, /8\s600 €/);
   });
 });
+
+describe('Annonces republiées', () => {
+  it('reconnaît la même voiture sous un nouvel identifiant et recalcule le temps en ligne', async () => {
+    const { repostIndex, withRepost } = await import('./history.js');
+    const old = { ...listing({ ad_id: 10, price: 8000 }), zip: '33000', publishedAt: '2026-09-01T00:00:00Z' };
+    const runs = [{ runId: 'a', fetchedAt: '2026-09-02T05:00:00Z', listings: [old] }];
+    const fresh = { ...listing({ ad_id: 11, price: 7700 }), zip: '33000', mileage: old.mileage + 300, publishedAt: '2026-10-21T00:00:00Z', marketPrice: 9500 };
+    const r = withRepost(fresh, repostIndex(runs));
+    assert.equal(r.repost?.previousId, old.id);
+    const a = scoreListing(r, { now: NOW });
+    assert.ok(a.daysOnline >= 50, String(a.daysOnline));
+    assert.equal(a.priceReasons.motivated[0].id, 'republiee');
+    const other = withRepost({ ...fresh, zip: '64000' }, repostIndex(runs));
+    assert.equal(other.repost, undefined, 'autre ville : autre voiture');
+  });
+});

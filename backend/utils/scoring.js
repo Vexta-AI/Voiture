@@ -70,6 +70,7 @@ import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplaceme
  * @property {{ price: number, low: number, high: number, comparables: number, daysOnMarket: number|null, radiusKm: number }} [localMarket] revente chez toi
  * @property {number} [argusPrice]    cote Argus saisie à la main
  * @property {{ from: number, to: number, amount: number, since: string }} [priceDrop] baisse relevée par le radar
+ * @property {{ previousId: string, firstSeenAt: string, previousPrice: number }} [repost] annonce republiée
  * @property {string[]} [photos]    photos de l'annonce
  * @property {number} [fiscalHp]       puissance fiscale (CV), base de la carte grise
  * @property {string} [vin]
@@ -122,7 +123,9 @@ export function brandKey(listing) {
 }
 
 export function daysOnline(listing, now = new Date()) {
-  const published = new Date(listing.publishedAt).getTime();
+  // Annonce republiée : le vendeur est en ligne depuis la première annonce, pas depuis la nouvelle.
+  const start = listing.repost?.firstSeenAt && listing.repost.firstSeenAt < listing.publishedAt ? listing.repost.firstSeenAt : listing.publishedAt;
+  const published = new Date(start).getTime();
   if (Number.isNaN(published)) return 0;
   return Math.max(0, Math.floor((now.getTime() - published) / DAY_MS));
 }
@@ -386,6 +389,13 @@ export function priceReasons(listing, text, online, now = new Date()) {
       return evidence ? [{ id: r.id, label: r.label, evidence }] : [];
     });
   const motivated = hits(PRICE_SIGNALS.motivated);
+  if (listing.repost) {
+    motivated.unshift({
+      id: 'republiee',
+      label: 'Annonce republiée',
+      evidence: `même voiture déjà en ligne depuis le ${new Date(listing.repost.firstSeenAt).toLocaleDateString('fr-FR')} (à ${listing.repost.previousPrice.toLocaleString('fr-FR')} €)`,
+    });
+  }
   // Baisse de prix relevée par le radar : le signal le plus fiable d'un vendeur qui veut vendre.
   if (listing.priceDrop) {
     const since = new Date(listing.priceDrop.since).toLocaleDateString('fr-FR');

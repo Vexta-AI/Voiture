@@ -100,7 +100,7 @@ export function buyerPitch(listing, buyer) {
 /**
  * Valide et normalise un acheteur saisi dans le CRM.
  * @param {unknown} input
- * @returns {{ ok: true, criteria: WaitingBuyer['criteria'], name: string, phone?: string, notes?: string } | { ok: false, error: string }}
+ * @returns {{ ok: true, criteria: WaitingBuyer['criteria'], name: string, phone?: string, email?: string, notes?: string } | { ok: false, error: string }}
  */
 export function parseBuyerInput(input) {
   if (!input || typeof input !== 'object') return { ok: false, error: 'objet attendu' };
@@ -121,6 +121,7 @@ export function parseBuyerInput(input) {
     ok: true,
     name,
     phone: typeof o.phone === 'string' ? o.phone.trim().slice(0, 40) || undefined : undefined,
+    email: typeof o.email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(o.email.trim()) ? o.email.trim().slice(0, 120) : undefined,
     notes: typeof o.notes === 'string' ? o.notes.trim().slice(0, 500) || undefined : undefined,
     criteria: {
       type: c.type === 'moto' ? 'moto' : 'auto',

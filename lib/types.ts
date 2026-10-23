@@ -40,6 +40,8 @@ export interface Listing {
   argusPrice?: number;
   /** Baisse de prix relevée par le radar (plus haut prix déjà vu -> prix actuel) */
   priceDrop?: { from: number; to: number; amount: number; since: string };
+  /** Annonce republiée : même voiture déjà vue sous une autre annonce */
+  repost?: { previousId: string; firstSeenAt: string; previousPrice: number };
   /** Photos de l'annonce (URL) */
   photos?: string[];
   /** Puissance fiscale (CV) : base de la carte grise */
