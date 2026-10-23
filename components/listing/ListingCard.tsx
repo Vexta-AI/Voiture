@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { cn, eur, km, signedEur } from '@/lib/format';
 import type { ScoredListing } from '@/lib/types';
 
+import { InspectionPanel } from './InspectionPanel';
 import { MarginBreakdown } from './MarginBreakdown';
 
 export type MessageKind = 'negotiation' | 'mandate';
@@ -24,6 +25,7 @@ export function ListingCard({
   onRemove,
   crm,
   buyers = [],
+  inspectable = false,
 }: {
   item: ScoredListing;
   mode?: 'hunt' | 'mandate';
@@ -35,6 +37,8 @@ export function ListingCard({
   crm?: { inCrm: boolean; onAdd: (item: ScoredListing, kind: 'achat' | 'mandat') => void };
   /** Acheteurs du réseau qui cherchent cette voiture. */
   buyers?: string[];
+  /** Inspection IA des photos disponible (annonce réelle du radar + clé API configurée). */
+  inspectable?: boolean;
 }) {
   const { listing, analysis } = item;
   const [open, setOpen] = useState(false);
@@ -279,6 +283,17 @@ export function ListingCard({
               </li>
             ))}
           </ul>
+        )}
+
+        {!refused && listing.photos && listing.photos.length > 0 && (
+          <InspectionPanel
+            listing={listing}
+            enabled={inspectable}
+            onPhoto={(i) => {
+              setPhoto(i);
+              setOpen(true);
+            }}
+          />
         )}
 
         {open && (

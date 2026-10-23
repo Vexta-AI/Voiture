@@ -44,6 +44,8 @@ export interface Listing {
   repost?: { previousId: string; firstSeenAt: string; previousPrice: number };
   /** Photos de l'annonce (URL) */
   photos?: string[];
+  /** Inspection IA des photos (indicative, jamais une expertise) */
+  inspection?: Inspection;
   /** Puissance fiscale (CV) : base de la carte grise */
   fiscalHp?: number;
   vin?: string;
@@ -61,6 +63,25 @@ export interface Listing {
   /** Distance à la base (km), calculée à l'ingestion */
   distanceKm?: number;
   zone?: 'prioritaire' | 'france';
+}
+
+/** Résultat de l'inspection des photos par Claude (backend/utils/inspection.js). */
+export interface Inspection {
+  verdict: 'rassurant' | 'a_verifier' | 'suspect';
+  summary: string;
+  defects: { zone: string; observation: string; severity: 'mineur' | 'moyen' | 'majeur'; photo: number | null }[];
+  consistency: { point: string; ok: boolean; observation: string }[];
+  odometer: { visible: boolean; reading: number | null; photo: number | null };
+  missingPhotos: string[];
+  questions: string[];
+  listingId: string;
+  /** Prix de l'annonce au moment de l'inspection */
+  price: number;
+  photosAnalysed: number;
+  photosTotal: number;
+  model: string;
+  costUsd: number;
+  at: string;
 }
 
 export type Analysis = ReturnType<typeof scoreListing>;

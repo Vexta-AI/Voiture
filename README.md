@@ -197,6 +197,27 @@ Chaque deal mené dans le CRM mesure la réalité, à comparer aux hypothèses d
 
 À partir de 3 deals, une mesure devient une **proposition de réglage**, jamais appliquée sans ton accord (`backend/utils/learning.js`). Ces chiffres n'existent que dans ton CRM : c'est l'avantage que personne ne peut copier.
 
+## Photos : check-list et inspection IA
+
+Chaque pépite affiche une **check-list gratuite** de ce qu'il faut regarder sur les photos avant de se déplacer : compteur, voyants, teinte des éléments, pneus, usure de l'intérieur, vraies photos du véhicule. Elle figure aussi dans l'alerte Telegram.
+
+En cas de doute, le bouton **🔍 Faire inspecter par l'IA** envoie à Claude (vision) les 6 premières photos et la description. Il ne tourne que quand tu cliques : l'inspection automatique est désactivée par défaut (`INSPECT_PER_RUN=0`). L'IA renvoie :
+- un verdict : rassurant, à vérifier ou suspect ;
+- les défauts visibles avec leur numéro de photo ;
+- la cohérence entre l'usure, le kilométrage et la description ;
+- le compteur lu sur la photo, signalé s'il s'écarte de l'annonce ;
+- les photos manquantes ;
+- les questions à poser au vendeur, reprises dans la fiche CRM.
+
+L'IA ne donne **aucun chiffrage de réparation** et ne change ni le score ni la marge. C'est indicatif : elle ne voit que les photos, la visite et le contrôle en garage restent obligatoires.
+
+À configurer dans Vercel :
+- `ANTHROPIC_API_KEY` (obligatoire) ;
+- `INSPECT_BUDGET_USD` : plafond mensuel, 20 $ par défaut ;
+- `INSPECT_PER_RUN` : inspections automatiques par run, 0 par défaut.
+
+Chaque inspection est gardée : rouvrir la carte ne coûte rien, seul « Refaire » relance l'IA.
+
 ## Sources & hypothèses (rien d'inventé)
 
 Chaque chiffre du radar est soit **sourcé**, soit **un choix métier signalé comme tel**. Aucune base de données publique ne donne de cote pro gratuite : le « prix marché » du radar est la **médiane des prix affichés** d'annonces comparables collectées, pas l'Argus ni un prix de vente réel.
@@ -219,6 +240,9 @@ Chaque chiffre du radar est soit **sourcé**, soit **un choix métier signalé c
 | Cotisations micro-entreprise | 12,3 % du prix de revente (achat-revente) ; 21,2 % de la commission + upsells (mandat) | Taux 2026 sur le **chiffre d'affaires** encaissé ([economie.gouv.fr](https://www.economie.gouv.fr/entreprises/micro-entreprise-auto-entreprise-charges-sociales)) | Sourcé ; `BUSINESS.status` dans `rules.js` |
 | TVA en pro | non déduite | Franchise en base : 85 000 € de CA en vente de marchandises en 2026 ([Legifiscal](https://www.legifiscal.fr/actualites-fiscales/4436-nouveaux-seuils-micro-entreprises-annee-2026.html)) ; au-delà, TVA sur la marge (art. 297 A du CGI) | À valider avec un comptable avant de passer pro |
 | Bonus campagne, points forts, MASTERCLASS | +5 / +2 par point / ×2 seuil | Choix métier pour trier (ne changent jamais la marge) | Choix métier |
+| Coût de l'inspection IA | tokens × 4 $ / 20 $ par million (entrée / sortie), affiché « estimé » | Tarif Claude Opus 5.5 ([Anthropic, pricing](https://platform.claude.com/docs/en/about-claude/pricing)) ; images limitées à 5 Mo ([Anthropic, vision](https://platform.claude.com/docs/en/build-with-claude/vision)) | Sourcé ; quelques centimes par annonce, à vérifier sur ta console Anthropic |
+| Inspection IA : 6 photos, 0 auto par run, budget 20 $/mois, écart compteur > 5 % et 2 000 km | — | Limites d'usage et seuil d'alerte | Choix métier (réglables dans Vercel) |
+| Check-list photos | 6 points | Points de contrôle courants d'un véhicule d'occasion | Choix métier |
 
 Les heuristiques de lecture (vendeur pressé, risques, points forts) lisent **ce que l'annonce écrit** : elles n'inventent rien, mais un vendeur peut mentir. Photos, HistoVec et essai restent obligatoires.
 

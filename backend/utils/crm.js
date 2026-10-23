@@ -29,7 +29,7 @@ const round50 = (n, dir = 'down') => (dir === 'up' ? Math.ceil(n / 50) * 50 : Ma
  * @property {'radar'|'manuel'} source
  * @property {string} createdAt
  * @property {string} updatedAt
- * @property {{ listingId: string, type: 'auto'|'moto', title: string, year: number, mileage: number, location?: string|null, url?: string|null, zone?: string|null, distanceKm?: number|null, areaType?: string|null, photo?: string|null, masterclass?: boolean, reasons?: string[], strengths?: string[], owners?: number|null }} vehicle
+ * @property {{ listingId: string, type: 'auto'|'moto', title: string, year: number, mileage: number, location?: string|null, url?: string|null, zone?: string|null, distanceKm?: number|null, areaType?: string|null, photo?: string|null, masterclass?: boolean, reasons?: string[], strengths?: string[], owners?: number|null, inspection?: { verdict: string, summary: string, questions: string[] }|null }} vehicle
  * @property {{ name?: string, phone?: string, channel?: string }} contact
  * @property {Record<string, number|null|undefined>} numbers
  * @property {{ subject: string, body: string } | null} firstMessage
@@ -114,6 +114,7 @@ export function createDeal({ kind, listing, analysis, message = null, offerPrice
       zone: analysis.zone ?? null,
       distanceKm: analysis.distanceKm ?? null,
       areaType: analysis.areaType ?? null,
+      inspection: listing.inspection ? { verdict: listing.inspection.verdict, summary: listing.inspection.summary, questions: listing.inspection.questions } : null,
     },
     contact: {},
     numbers,

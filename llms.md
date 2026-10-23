@@ -11,6 +11,7 @@
 - Cible les vendeurs dont l'annonce est en ligne depuis plus de 14 jours pour leur proposer un dépôt-vente sans avance de trésorerie.
 - Génère les messages au vendeur : négociation argumentée (remise d'environ 10 %, 800 € à 2 500 €, paiement par virement instantané) et proposition de mandat (commission sur la plus-value au-dessus du prix net vendeur).
 
+- Photos : check-list gratuite sur chaque pépite, et inspection IA (Claude vision) à la demande : défauts visibles, cohérence km / usure, compteur lu sur photo, questions au vendeur. Indicatif, ne change ni score ni marge.
 - CRM : pipelines achat-revente, mandat et acheteurs ; lecture des réponses (accord, contre-offre, question, refus) ; chaleur des leads ; réponses, relances et papiers préparés.
 
 ## API
@@ -19,6 +20,7 @@
 - `POST /api/score` : analyse une annonce JSON ou un tableau d'annonces.
 - `POST /api/messages` : script de négociation ou de mandat pour une annonce.
 - `GET/POST /api/crm`, `PATCH/DELETE /api/crm/:id` : deals du CRM (actions : message envoyé / reçu, étape, note, papiers, chiffres).
+- `GET/POST /api/inspect` : état et budget de l'inspection IA ; inspection des photos d'une annonce du radar (`listingId`).
 - `POST /api/outreach` : message autonome au format JSON stable pour Make.com (stratégie choisie automatiquement).
 
 ## Fichiers clés
@@ -27,6 +29,7 @@
 - `backend/utils/scoring.js` : moteur de scoring.
 - `backend/utils/messages.js` : générateur de messages.
 - `backend/utils/outreach.js` : choix de stratégie et payload d'outreach.
+- `backend/utils/inspection.js` et `lib/inspect.ts` : check-list photos, schéma et appel de l'inspection IA.
 - `backend/config/crm.js` et `backend/utils/crm.js` : règles et moteur du CRM.
 
 ## Règle de fiabilité

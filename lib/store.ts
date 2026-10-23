@@ -179,3 +179,40 @@ export async function recentOndemandKeys(days: number) {
     (await listAll(ONDEMAND_PREFIX)).filter((b) => b.uploadedAt.getTime() >= since).map((b) => b.pathname.slice(ONDEMAND_PREFIX.length).replace(/\.json$/, '')),
   );
 }
+
+const INSPECTIONS_PREFIX = 'radar/inspections/';
+const INSPECT_SPEND_PREFIX = 'radar/inspect-spend/';
+const safeKey = (s: string) => s.replace(/[^a-zA-Z0-9-]/g, '_');
+
+/** Inspection IA des photos d'une annonce (une par annonce, refaite seulement à la demande). */
+export async function saveInspection(listingId: string, inspection: unknown) {
+  await writeJson(`${INSPECTIONS_PREFIX}${safeKey(listingId)}.json`, inspection, true);
+}
+
+export async function loadInspection<T>(listingId: string) {
+  return readJson<T>(`${INSPECTIONS_PREFIX}${safeKey(listingId)}.json`);
+}
+
+/** Inspections des annonces demandées (celles qui existent). */
+export async function loadInspections<T>(listingIds: string[]) {
+  const wanted = new Map(listingIds.map((id) => [`${INSPECTIONS_PREFIX}${safeKey(id)}.json`, id]));
+  const blobs = (await listAll(INSPECTIONS_PREFIX)).filter((b) => wanted.has(b.pathname));
+  const out = new Map<string, T>();
+  await Promise.all(
+    blobs.map(async (b) => {
+      const value = await readJson<T>(b.pathname).catch(() => null);
+      if (value) out.set(wanted.get(b.pathname) as string, value);
+    }),
+  );
+  return out;
+}
+
+/** Dépense IA du mois (dollars facturés par Anthropic, estimés depuis les tokens). */
+export async function inspectSpend(month = new Date().toISOString().slice(0, 7)) {
+  return (await readJson<{ usd: number; count: number }>(`${INSPECT_SPEND_PREFIX}${month}.json`)) ?? { usd: 0, count: 0 };
+}
+
+export async function addInspectSpend(usd: number, month = new Date().toISOString().slice(0, 7)) {
+  const current = await inspectSpend(month);
+  await writeJson(`${INSPECT_SPEND_PREFIX}${month}.json`, { usd: Math.round((current.usd + usd) * 10_000) / 10_000, count: current.count + 1 }, true);
+}

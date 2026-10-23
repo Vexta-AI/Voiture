@@ -6,7 +6,8 @@ import { logIngest } from '@/lib/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// Inspections IA des photos (quelques pépites par run, en parallèle) : jusqu'à ~2 min de plus.
+export const maxDuration = 300;
 
 /**
  * POST /api/hunt/ingest?source=<clé> — webhook Apify de fin de run (en-tête x-ingest-secret).

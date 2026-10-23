@@ -295,6 +295,7 @@ export function Dashboard({ initialListings, pending = [], radar }: { initialLis
                 onOutreach={setOutreach}
                 onRemove={userIds.has(item.listing.id) ? (id) => persist(userListings.filter((l) => l.id !== id)) : undefined}
                 buyers={matchBuyers(item.listing, buyers).map((m) => m.buyer.name)}
+                inspectable={aiEnabled && radar.mode === 'live' && !userIds.has(item.listing.id)}
                 crm={crmIds ? { inCrm: crmIds.has(`${tab === 'mandat' ? 'mandat' : 'achat'}:${item.listing.id}`), onAdd: addToCrm } : undefined}
               />
             ))}

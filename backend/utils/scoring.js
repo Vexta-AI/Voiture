@@ -85,6 +85,7 @@ import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplaceme
  * @property {string} [location]
  * @property {string} [source]
  * @property {string} [url]
+ * @property {{ verdict: 'rassurant'|'a_verifier'|'suspect', summary: string, questions: string[] }} [inspection] inspection IA des photos (indicative)
  */
 
 export const STATUS = /** @type {const} */ ({

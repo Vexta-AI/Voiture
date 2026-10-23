@@ -4,6 +4,7 @@
  * bannit les envois automatisés) : tout le reste est automatique.
  */
 
+import { PHOTO_CHECKLIST, inspectionLine } from '../utils/inspection.js';
 import { adUrl } from '../utils/links.js';
 
 const escape = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -14,7 +15,7 @@ const MAX_LENGTH = 4096;
 
 /**
  * @param {Extract<ReturnType<import('../utils/outreach.js').buildOutreachPayload>, { ok: true }>} payload
- * @param {{ comparables?: number, buyers?: { name: string, budgetMax: number }[] }} [context]
+ * @param {{ comparables?: number, buyers?: { name: string, budgetMax: number }[], inspection?: any }} [context]
  */
 export function formatTelegramAlert(payload, context = {}) {
   const { listing, scoring, negotiation, mandate, message } = payload;
@@ -41,6 +42,8 @@ export function formatTelegramAlert(payload, context = {}) {
   if (payload.strategy === 'mandate' && mandate) {
     lines.push(`Prix net vendeur ${eur(mandate.ownerNet)} · plus-value ${eur(mandate.commission)}`);
   }
+  if (context.inspection) lines.push(escape(inspectionLine(context.inspection, listing.mileage)));
+  else if (payload.strategy === 'negotiation') lines.push(`👀 <i>À regarder sur les photos :</i> ${PHOTO_CHECKLIST.map((c) => escape(c.split(' : ')[0].toLowerCase())).join(', ')}`);
   if (context.buyers?.length) {
     lines.push(`👥 <b>Acheteur(s) prêt(s)</b> : ${context.buyers.map((b) => `${escape(b.name)} (budget ${eur(b.budgetMax)})`).join(', ')}`);
   }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { DOCUMENTS, LOST_REASONS, PIPELINES } from '@/backend/config/crm.js';
 import { dealEconomics, leadHeat, listedPriceOf, nextAction } from '@/backend/utils/crm.js';
+import { verdictLabel } from '@/backend/utils/inspection.js';
 import { adUrl } from '@/backend/utils/links.js';
 import { Chip } from '@/components/ui/Chip';
 import { Modal } from '@/components/ui/Modal';
@@ -125,6 +126,27 @@ function DealPanel({ deal, deals, now, onAct, onAddBuyer, onOpen, onDelete }: Pr
             </div>
           )}
         </div>
+        {deal.vehicle.inspection && (
+          <div className="rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-700">
+            <p>
+              <span className="font-semibold text-ink-900">🔍 Photos (IA) : {verdictLabel(deal.vehicle.inspection.verdict)}</span> · {deal.vehicle.inspection.summary}
+            </p>
+            {deal.vehicle.inspection.questions.length > 0 && (
+              <>
+                <p className="mt-1.5 font-semibold text-ink-900">Questions à poser au vendeur</p>
+                <ul className="mt-0.5 space-y-0.5">
+                  {deal.vehicle.inspection.questions.map((q) => (
+                    <li key={q}>• {q}</li>
+                  ))}
+                </ul>
+                <div className="mt-1.5">
+                  <CopyButton text={deal.vehicle.inspection.questions.map((q) => `• ${q}`).join('\n')} label="Copier les questions" />
+                </div>
+              </>
+            )}
+            <p className="mt-1 text-[11px] text-ink-400">Indicatif : ne remplace ni la visite ni un contrôle en garage.</p>
+          </div>
+        )}
         {vehicle && (
           <button type="button" className="text-xs text-sky-700 underline dark:text-sky-400" onClick={() => onOpen(vehicle.id)}>
             Voir le véhicule ({PIPELINES[vehicle.kind].stages.find((s) => s.id === vehicle.stage)?.label})
