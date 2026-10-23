@@ -13,6 +13,10 @@ export interface Listing {
   engine?: string;
   engineCode?: string;
   gearbox?: string;
+  /** Carburant (Essence, Diesel, Hybride, Électrique) */
+  fuel?: string;
+  /** Puissance DIN (ch) */
+  powerDin?: number;
   year: number;
   mileage: number;
   price: number;
@@ -21,9 +25,9 @@ export interface Listing {
   options?: string[];
   doors?: number;
   /** Marché actuel : fourchette des comparables (25-75 %), nombre, jours en ligne médians */
-  marketStats?: { low: number; high: number; comparables: number; daysOnMarket: number | null };
+  marketStats?: { low: number; high: number; comparables: number; daysOnMarket: number | null; criteria?: string[] };
   /** Revente chez toi : comparables à moins de 100 km (200 km à défaut) de la base */
-  localMarket?: { price: number; low: number; high: number; comparables: number; daysOnMarket: number | null; radiusKm: number };
+  localMarket?: { price: number; low: number; high: number; comparables: number; daysOnMarket: number | null; radiusKm: number; criteria?: string[] };
   /** Cote Argus saisie à la main (pas d'accès gratuit à l'Argus officiel) */
   argusPrice?: number;
   /** Photos de l'annonce (URL) */

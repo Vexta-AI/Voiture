@@ -64,7 +64,9 @@ import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplaceme
  * @property {string} [description]
  * @property {string[]} [options]
  * @property {number} [doors]
- * @property {{ low: number, high: number, comparables: number, daysOnMarket: number|null }} [marketStats] marché actuel (comparables)
+ * @property {string} [fuel]           carburant
+ * @property {number} [powerDin]       puissance DIN (ch)
+ * @property {{ low: number, high: number, comparables: number, daysOnMarket: number|null, criteria?: string[] }} [marketStats] marché actuel (comparables)
  * @property {{ price: number, low: number, high: number, comparables: number, daysOnMarket: number|null, radiusKm: number }} [localMarket] revente chez toi
  * @property {number} [argusPrice]    cote Argus saisie à la main
  * @property {string[]} [photos]    photos de l'annonce

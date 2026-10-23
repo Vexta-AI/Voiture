@@ -56,6 +56,8 @@ export function validateListing(input: unknown): Result {
       options: Array.isArray(o.options) ? o.options.filter((x): x is string => typeof x === 'string') : undefined,
       doors: num(o.doors),
       fiscalHp: num(o.fiscalHp),
+      fuel: str(o.fuel),
+      powerDin: num(o.powerDin),
       argusPrice: num(o.argusPrice),
       marketStats:
         o.marketStats && typeof o.marketStats === 'object'
