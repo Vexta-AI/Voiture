@@ -28,3 +28,7 @@
 - `backend/utils/messages.js` : générateur de messages.
 - `backend/utils/outreach.js` : choix de stratégie et payload d'outreach.
 - `backend/config/crm.js` et `backend/utils/crm.js` : règles et moteur du CRM.
+
+## Règle de fiabilité
+
+Aucun chiffre n'est inventé : chaque valeur métier est sourcée (README, section « Sources & hypothèses ») ou signalée comme choix métier / à valider. Le prix marché est la médiane des prix affichés d'annonces comparables, pas l'Argus. Voir `CLAUDE.md`.
