@@ -447,3 +447,28 @@ describe('Fiabilité de la cote', () => {
     assert.equal(selectAlerts(weak.priced, { now: NOW }).length, 0);
   });
 });
+
+describe('Baisses de prix', () => {
+  it('repère une baisse depuis un relevé précédent et en fait un signal vendeur motivé', async () => {
+    const { priceHistory, withPriceDrop } = await import('./history.js');
+    const runs = [
+      { runId: 'a', fetchedAt: '2026-10-10T05:00:00Z', listings: [{ id: 'lbc-1', price: 7500 }] },
+      { runId: 'b', fetchedAt: '2026-10-15T05:00:00Z', listings: [{ id: 'lbc-1', price: 7200 }] },
+      { runId: 'now', fetchedAt: '2026-10-22T05:00:00Z', listings: [{ id: 'lbc-1', price: 6900 }] },
+    ];
+    const h = priceHistory(runs, { excludeRunId: 'now' });
+    const l = withPriceDrop({ ...listing({ ad_id: 1, price: 6900 }), marketPrice: 9000 }, h);
+    assert.deepEqual(l.priceDrop, { from: 7500, to: 6900, amount: 600, since: '2026-10-10T05:00:00Z' });
+    const a = scoreListing(l, { now: NOW });
+    assert.equal(a.priceReasons.motivated[0].id, 'baisse');
+    assert.equal(withPriceDrop({ id: 'lbc-1', price: 7450 }, h).priceDrop, undefined, 'moins de 100 € : pas une baisse');
+  });
+
+  it('le message de négo cite le bas du marché des annonces comparées', async () => {
+    const { generateNegotiationMessage } = await import('../utils/messages.js');
+    const l = { ...listing({ ad_id: 2, price: 9000 }), marketPrice: 9500, marketStats: { low: 8600, high: 9800, comparables: 7, daysOnMarket: 20 } };
+    const msg = generateNegotiationMessage(l, scoreListing(l, { now: NOW }));
+    assert.match(msg.text, /7 annonces équivalentes/);
+    assert.match(msg.text, /8\s600 €/);
+  });
+});

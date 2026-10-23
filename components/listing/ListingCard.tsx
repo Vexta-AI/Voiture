@@ -81,6 +81,11 @@ export function ListingCard({
                 {analysis.distanceKm} km
               </Chip>
             )}
+            {listing.priceDrop && (
+              <Chip tone="red" title={`Relevé par le radar : ${eur(listing.priceDrop.from)} → ${eur(listing.priceDrop.to)}`}>
+                📉 −{eur(listing.priceDrop.amount)}
+              </Chip>
+            )}
             {analysis.areaType === 'campagne' && (
               <Chip tone="green" title={`${analysis.cityKm} km de ${analysis.nearestCity} : prix de campagne, revente en ville`}>
                 🌾 Campagne

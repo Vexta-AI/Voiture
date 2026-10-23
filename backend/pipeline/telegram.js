@@ -21,7 +21,7 @@ export function formatTelegramAlert(payload, context = {}) {
   const head =
     payload.strategy === 'mandate'
       ? `🤝 <b>MANDAT J+${listing.daysOnline}</b> · revenu ${eur(mandate?.totalRevenue ?? 0)} · 0 € de trésorerie`
-      : `${scoring.masterclass ? '💎 <b>MASTERCLASS</b>' : '🔥 <b>PÉPITE</b>'} · marge réelle ${eur(scoring.realNetMargin)} · score ${scoring.score}/100`;
+      : `${listing.priceDrop ? `📉 <b>BAISSE −${eur(listing.priceDrop.amount)}</b> · ` : ''}${scoring.masterclass ? '💎 <b>MASTERCLASS</b>' : '🔥 <b>PÉPITE</b>'} · marge réelle ${eur(scoring.realNetMargin)} · score ${scoring.score}/100`;
 
   const lines = [
     head,
