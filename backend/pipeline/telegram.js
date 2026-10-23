@@ -4,6 +4,8 @@
  * bannit les envois automatisés) : tout le reste est automatique.
  */
 
+import { adUrl } from '../utils/links.js';
+
 const escape = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const eur = (n) => `${Math.round(n).toLocaleString('fr-FR')} €`;
 
@@ -19,7 +21,7 @@ export function formatTelegramAlert(payload, context = {}) {
   const head =
     payload.strategy === 'mandate'
       ? `🤝 <b>MANDAT J+${listing.daysOnline}</b> · revenu ${eur(mandate?.totalRevenue ?? 0)} · 0 € de trésorerie`
-      : `🔥 <b>PÉPITE</b> · marge réelle ${eur(scoring.realNetMargin)} · score ${scoring.score}/100`;
+      : `${scoring.masterclass ? '💎 <b>MASTERCLASS</b>' : '🔥 <b>PÉPITE</b>'} · marge réelle ${eur(scoring.realNetMargin)} · score ${scoring.score}/100`;
 
   const lines = [
     head,
@@ -27,13 +29,15 @@ export function formatTelegramAlert(payload, context = {}) {
     `${listing.year} · ${listing.mileage.toLocaleString('fr-FR')} km · ${escape(listing.location ?? '')}`,
     `Prix ${eur(listing.price)} · cote ${eur(listing.marketPrice)}${context.comparables ? ` (${context.comparables} comparables)` : ''}`,
   ];
+  if (scoring.reasons?.length) lines.push(`<i>Pourquoi ce prix :</i> ${scoring.reasons.slice(0, 3).map(escape).join(' ')}`);
   if (payload.strategy === 'negotiation' && negotiation) {
     lines.push(`Offre : <b>${eur(negotiation.offerPrice)}</b> (−${eur(negotiation.discount)}) · marge négociée ${eur(scoring.negotiatedNetMargin)}`);
   }
   if (payload.strategy === 'mandate' && mandate) {
     lines.push(`Prix net vendeur ${eur(mandate.ownerNet)} · plus-value ${eur(mandate.commission)}`);
   }
-  if (listing.url) lines.push(`<a href="${escape(listing.url)}">Ouvrir l'annonce</a>`);
+  const url = adUrl(listing);
+  if (url) lines.push(`<a href="${escape(url)}">👉 Ouvrir l'annonce</a>`);
   lines.push('', '<b>Message à envoyer :</b>');
 
   const header = lines.join('\n');

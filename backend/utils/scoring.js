@@ -28,7 +28,9 @@ import {
   MOTO_A2,
   MOTO_TARGETS,
   NEGOTIATION_LEVERS,
+  MASTERCLASS,
   PRICE_BANDS,
+  PRICE_SIGNALS,
   REGISTRATION,
   RURAL,
   SEASONALITY,
@@ -58,6 +60,7 @@ import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplaceme
  * @property {string} [description]
  * @property {string[]} [options]
  * @property {number} [doors]
+ * @property {string[]} [photos]    photos de l'annonce
  * @property {number} [fiscalHp]       puissance fiscale (CV), base de la carte grise
  * @property {string} [vin]
  * @property {'MTT1'|'MTT2'} [licenseCategory]  moto : carte grise A2 (MTT1) ou Full (MTT2)
@@ -355,6 +358,37 @@ export function computeMandate(listing) {
 // ---------------------------------------------------------------------------
 // 5. Scoring principal
 /**
+ * Pourquoi ce prix ? Lecture de l'écart à la cote et du texte de l'annonce :
+ * vendeur pressé (bonne affaire réelle) ou défaut caché (prix bas justifié).
+ * @returns {{ gapRate: number, motivated: {id: string, label: string, evidence: string}[], risks: {id: string, label: string, evidence: string}[], reasons: string[] }}
+ */
+export function priceReasons(listing, text, online, now = new Date()) {
+  const market = Number(listing.marketPrice) || 0;
+  const gapRate = market > 0 ? (market - listing.price) / market : 0;
+  const hits = (rules) =>
+    rules.flatMap((r) => {
+      const evidence = findPattern(text, r.pattern);
+      return evidence ? [{ id: r.id, label: r.label, evidence }] : [];
+    });
+  const motivated = hits(PRICE_SIGNALS.motivated);
+  const risks = hits(PRICE_SIGNALS.risks);
+  const reasons = [];
+  if (gapRate >= PRICE_SIGNALS.bigGapRate) reasons.push(`${Math.round(gapRate * 100)} % sous la cote du marché.`);
+  else if (gapRate > 0) reasons.push(`${Math.round(gapRate * 100)} % sous la cote : petite décote, la marge se fera à la négo.`);
+  for (const m of motivated) reasons.push(`Vendeur pressé : ${m.label.toLowerCase()} (« ${m.evidence} »).`);
+  const age = Math.max(1, now.getFullYear() - Number(listing.year));
+  const perYear = listing.mileage ? Math.round(listing.mileage / age) : 0;
+  if (perYear > PRICE_SIGNALS.highMileagePerYear) reasons.push(`Gros rouleur : ${perYear.toLocaleString('fr-FR')} km/an, la décote est en partie normale.`);
+  if (online >= MANDATE.minDaysOnline) reasons.push(`En ligne depuis ${online} jours : vendeur lassé.`);
+  if (/pro/i.test(String(listing.source ?? ''))) reasons.push('Vendeur professionnel : prix souvent déjà travaillé, garantie à exiger.');
+  for (const r of risks) reasons.push(`⚠️ ${r.label} : « ${r.evidence} ». Le prix bas s'explique peut-être, vérifier avant de bouger.`);
+  if (gapRate >= PRICE_SIGNALS.bigGapRate && motivated.length === 0 && risks.length === 0) {
+    reasons.push("Aucune raison donnée dans l'annonce : demander au vendeur pourquoi il vend, et regarder les photos de près.");
+  }
+  return { gapRate, motivated, risks, reasons };
+}
+
+/**
  * Campagne ou ville : distance à la grande ville la plus proche (GPS requis).
  * @returns {{ type: 'campagne'|'ville'|null, nearestCity: string|null, cityKm: number|null }}
  */
@@ -483,6 +517,16 @@ export function scoreListing(listing, options = {}) {
   else if (realNetMargin > 0 || negotiatedNetMargin > 0) status = STATUS.SURVEILLER;
   else status = STATUS.REFUSE;
 
+  // --- Pourquoi ce prix ? & MASTERCLASS ---
+  const why = priceReasons(listing, text, online, now);
+  const masterclass =
+    status.key === 'PEPITE' &&
+    realNetMargin >= threshold * MASTERCLASS.marginMultiplier &&
+    why.risks.length === 0 &&
+    marketPrice > 0 &&
+    askingPrice >= marketPrice * MASTERCLASS.minPriceRate;
+  if (why.risks.length > 0 && status.key === 'PEPITE') warnings.push(`Prix bas possiblement justifié : ${why.risks.map((r) => r.label).join(', ')}.`);
+
   // --- Score 0-100 ---
   let score = 0;
   if (!isBlacklisted) {
@@ -498,6 +542,7 @@ export function scoreListing(listing, options = {}) {
     if (!inBudget) penalties += 10;
     score = Math.round(clamp(marginPts + triggerPts + leverPts + agePts + ruralPts + liquidityPts - penalties, 0, 100));
     if (status.key === 'REFUSE') score = Math.min(score, 20);
+    if (masterclass) score = Math.min(100, score + MASTERCLASS.scoreBonus);
   }
 
   // Le dépôt-vente suppose de récupérer le véhicule : zone prioritaire uniquement.
@@ -506,6 +551,8 @@ export function scoreListing(listing, options = {}) {
   return {
     listingId: listing.id,
     status,
+    masterclass,
+    priceReasons: why,
     score,
     segment,
     segmentLabel: segmentRule.label,

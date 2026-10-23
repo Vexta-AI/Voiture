@@ -11,6 +11,7 @@
 
 import { DOCUMENTS, FOLLOW_UP, HEAT, PIPELINES, RESALE } from '../config/crm.js';
 import { COSTS, MANDATE, REGISTRATION } from '../config/rules.js';
+import { adUrl } from './links.js';
 import { clamp, normalize } from './text.js';
 
 const DAY_MS = 86_400_000;
@@ -28,7 +29,7 @@ const round50 = (n, dir = 'down') => (dir === 'up' ? Math.ceil(n / 50) * 50 : Ma
  * @property {'radar'|'manuel'} source
  * @property {string} createdAt
  * @property {string} updatedAt
- * @property {{ listingId: string, type: 'auto'|'moto', title: string, year: number, mileage: number, location?: string|null, url?: string|null, zone?: string|null, distanceKm?: number|null, areaType?: string|null }} vehicle
+ * @property {{ listingId: string, type: 'auto'|'moto', title: string, year: number, mileage: number, location?: string|null, url?: string|null, zone?: string|null, distanceKm?: number|null, areaType?: string|null, photo?: string|null, masterclass?: boolean, reasons?: string[] }} vehicle
  * @property {{ name?: string, phone?: string, channel?: string }} contact
  * @property {Record<string, number|null|undefined>} numbers
  * @property {{ subject: string, body: string } | null} firstMessage
@@ -97,7 +98,10 @@ export function createDeal({ kind, listing, analysis, message = null, offerPrice
       year: listing.year,
       mileage: listing.mileage,
       location: listing.location ?? null,
-      url: listing.url ?? null,
+      url: adUrl(listing),
+      photo: listing.photos?.[0] ?? null,
+      masterclass: Boolean(analysis.masterclass),
+      reasons: analysis.priceReasons?.reasons ?? [],
       zone: analysis.zone ?? null,
       distanceKm: analysis.distanceKm ?? null,
       areaType: analysis.areaType ?? null,

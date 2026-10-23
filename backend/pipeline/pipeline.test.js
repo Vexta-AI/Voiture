@@ -341,3 +341,24 @@ describe('Modèles LeBonCoin', () => {
     assert.equal(new URL(ondemandSource({ ...a, year: 2018 }).input.searchUrl).searchParams.get('text'), 'volkswagen tiguan');
   });
 });
+
+describe('Lien de l’annonce', () => {
+  it('reconstruit le lien LeBonCoin depuis l’identifiant', async () => {
+    const { adUrl } = await import('../utils/links.js');
+    assert.equal(adUrl({ id: 'lbc-2841234567', type: 'auto' }), 'https://www.leboncoin.fr/ad/voitures/2841234567');
+    assert.equal(adUrl({ listingId: 'lbc-12', type: 'moto' }), 'https://www.leboncoin.fr/ad/motos/12');
+    assert.equal(adUrl({ id: 'x', url: 'https://a.b/c' }), 'https://a.b/c');
+    assert.equal(adUrl({ id: 'a-001' }), null);
+  });
+});
+
+describe('Photos', () => {
+  it('lit les photos quel que soit le format du scraper', async () => {
+    const { extractPhotos } = await import('./normalize.js');
+    assert.deepEqual(extractPhotos({ images: ['https://img/1.jpg', 'https://img/2.jpg'] }), ['https://img/1.jpg', 'https://img/2.jpg']);
+    assert.deepEqual(extractPhotos({ images: { urls_large: ['https://img/a.jpg'] } }), ['https://img/a.jpg']);
+    assert.deepEqual(extractPhotos({ images: [{ url: 'https://img/b.jpg' }] }), ['https://img/b.jpg']);
+    assert.deepEqual(extractPhotos({ thumbnail: 'https://img/t.jpg' }), ['https://img/t.jpg']);
+    assert.deepEqual(extractPhotos({}), []);
+  });
+});

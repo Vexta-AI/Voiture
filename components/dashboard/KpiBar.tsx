@@ -33,7 +33,12 @@ export function KpiBar({ tab, items }: { tab: TabKey; items: ScoredListing[] }) 
   return (
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <Kpi label="Annonces scannées" value={String(items.length)} sub={`${watch.length} à surveiller`} />
-      <Kpi label="🔥 Pépites potentielles" value={String(pepites.length)} sub="au-dessus du seuil de marge" accent />
+      <Kpi
+        label="🔥 Pépites potentielles"
+        value={String(pepites.length)}
+        sub={`dont ${pepites.filter((s) => s.analysis.masterclass).length} 💎 masterclass`}
+        accent
+      />
       <Kpi label="Marge réelle cumulée (pépites)" value={eur(potential)} sub="carte grise déduite, avant négo" accent />
       <Kpi label="Blacklist évitée" value={String(refused.length)} sub="moteurs poison & mots-clés" />
     </section>

@@ -20,6 +20,8 @@ export interface Listing {
   description?: string;
   options?: string[];
   doors?: number;
+  /** Photos de l'annonce (URL) */
+  photos?: string[];
   /** Puissance fiscale (CV) : base de la carte grise */
   fiscalHp?: number;
   vin?: string;

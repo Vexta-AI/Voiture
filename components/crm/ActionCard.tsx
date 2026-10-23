@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import type { leadHeat, nextAction } from '@/backend/utils/crm.js';
 import { LOST_REASONS } from '@/backend/config/crm.js';
+import { adUrl } from '@/backend/utils/links.js';
 import { Chip } from '@/components/ui/Chip';
 import type { Deal } from '@/lib/crm';
 import { cn, eur } from '@/lib/format';
@@ -62,6 +63,7 @@ export function ActionCard({ deal, action, heat, onAct, onOpen }: { deal: Deal; 
   const [pending, setPending] = useState(false);
   const lastIn = [...deal.events].reverse().find((e) => e.type === 'in');
   const party = deal.kind === 'revente' ? "l'acheteur" : 'le vendeur';
+  const vehicleUrl = adUrl({ ...deal.vehicle, id: deal.vehicle.listingId });
 
   const run = async (body: DealActionBody) => {
     setPending(true);
@@ -76,15 +78,28 @@ export function ActionCard({ deal, action, heat, onAct, onOpen }: { deal: Deal; 
   return (
     <article className={cn('card flex min-w-0 flex-col gap-3 p-4', heat.level === 'chaud' && 'border-rose-300 dark:border-rose-500/40')}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        {deal.vehicle.photo && (
+          <a href={vehicleUrl ?? undefined} target="_blank" rel="noreferrer" className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-ink-100">
+            {/* eslint-disable-next-line @next/next/no-img-element -- photo LeBonCoin externe */}
+            <img src={deal.vehicle.photo} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+          </a>
+        )}
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <HeatBadge level={heat.level} score={heat.score} />
             <Chip tone={KIND_TONE[deal.kind]}>{KIND_LABEL[deal.kind]}</Chip>
+            {deal.vehicle.masterclass && <span className="rounded-md bg-violet-600 px-2 py-0.5 text-xs font-bold text-white">💎 MASTERCLASS</span>}
             {deal.vehicle.areaType === 'campagne' && <Chip tone="green">🌾 Campagne</Chip>}
             {deal.source === 'radar' && <Chip>Radar</Chip>}
           </div>
           <h3 className="mt-1.5 truncate text-[15px] font-semibold text-ink-900" title={deal.vehicle.title}>
-            {deal.vehicle.title}
+            {vehicleUrl ? (
+              <a href={vehicleUrl} target="_blank" rel="noreferrer" className="hover:underline">
+                {deal.vehicle.title} ↗
+              </a>
+            ) : (
+              deal.vehicle.title
+            )}
           </h3>
           <p className="truncate text-xs text-ink-500">
             {deal.vehicle.year} · {Number(deal.vehicle.mileage).toLocaleString('fr-FR')} km
@@ -98,6 +113,15 @@ export function ActionCard({ deal, action, heat, onAct, onOpen }: { deal: Deal; 
       </div>
 
       <DealNumbers deal={deal} />
+
+      {deal.vehicle.reasons && deal.vehicle.reasons.length > 0 && (
+        <ul className="space-y-0.5 rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-600">
+          <li className="font-semibold text-ink-900">Pourquoi ce prix ?</li>
+          {deal.vehicle.reasons.slice(0, 3).map((r) => (
+            <li key={r}>• {r}</li>
+          ))}
+        </ul>
+      )}
 
       {heat.reasons.length > 0 && <p className="text-xs text-ink-600">{heat.reasons.join(' · ')}</p>}
 
@@ -163,8 +187,8 @@ export function ActionCard({ deal, action, heat, onAct, onOpen }: { deal: Deal; 
             Papiers & date
           </button>
         )}
-        {deal.vehicle.url && (
-          <a className="btn-ghost text-xs" href={deal.vehicle.url} target="_blank" rel="noreferrer">
+        {vehicleUrl && (
+          <a className="btn-secondary text-xs" href={vehicleUrl} target="_blank" rel="noreferrer">
             Ouvrir l’annonce ↗
           </a>
         )}

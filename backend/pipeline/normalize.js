@@ -68,6 +68,26 @@ export function cleanModel(model, brand) {
   return m;
 }
 
+/**
+ * Photos de l'annonce, quel que soit le format du scraper
+ * (tableau d'URL, tableau d'objets { url }, objet images.urls_large / urls, miniature).
+ * @returns {string[]} 8 photos max
+ */
+export function extractPhotos(item) {
+  const out = [];
+  const add = (v) => {
+    if (typeof v === 'string' && /^https?:\/\//.test(v)) out.push(v);
+    else if (v && typeof v === 'object') add(v.url ?? v.src ?? v.large ?? v.urls_large?.[0]);
+  };
+  const sources = [item.images, item.image_urls, item.imageUrls, item.photos, item.pictures];
+  for (const s of sources) {
+    if (Array.isArray(s)) s.forEach(add);
+    else if (s && typeof s === 'object') (s.urls_large ?? s.urls ?? s.urls_thumb ?? []).forEach?.(add);
+  }
+  if (out.length === 0) add(item.thumbnail ?? item.thumb_url ?? item.image ?? item.image_url);
+  return [...new Set(out)].slice(0, 8);
+}
+
 const capitalize = (s) => s.replace(/(^|[\s-])([a-zà-ÿ])/g, (_, sep, c) => sep + c.toUpperCase());
 
 /**
@@ -128,7 +148,8 @@ export function normalizeApifyItem(item, context) {
       publishedAt: item.published_date ?? item.first_publication_date ?? item.index_date ?? new Date().toISOString(),
       location: city ? `${city}${zip ? ` (${String(zip).slice(0, 2)})` : ''}` : undefined,
       source: item.owner_type === 'pro' ? 'LeBonCoin · Pro' : 'LeBonCoin · Particulier',
-      url: item.url ?? undefined,
+      url: item.url ?? item.link ?? item.ad_url ?? `https://www.leboncoin.fr/ad/${context.type === 'moto' ? 'motos' : 'voitures'}/${id}`,
+      photos: extractPhotos(item),
       lat: toCoord(item.location_lat ?? item.lat),
       lng: toCoord(item.location_lng ?? item.lng),
       zip: zip ? String(zip) : undefined,

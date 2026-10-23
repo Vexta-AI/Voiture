@@ -340,3 +340,31 @@ describe('Campagne / ville', () => {
     assert.equal(score({}).areaType, null, 'sans GPS : inconnu');
   });
 });
+
+describe('Pourquoi ce prix ? / MASTERCLASS', () => {
+  it('vendeur pressé + grosse marge sans risque = MASTERCLASS', () => {
+    const a = score({ price: 5000, marketPrice: 8000, description: 'Vente urgente cause départ à l’étranger.' });
+    assert.equal(a.status.key, 'PEPITE');
+    assert.equal(a.masterclass, true);
+    assert.ok(a.priceReasons.motivated.some((m) => m.id === 'urgent'));
+    assert.ok(a.priceReasons.reasons[0].includes('% sous la cote'));
+  });
+
+  it('un défaut caché explique le prix : jamais MASTERCLASS', () => {
+    const a = score({ price: 5000, marketPrice: 8000, description: 'Petit accident sur l’arrière, roule bien.' });
+    assert.equal(a.masterclass, false);
+    assert.ok(a.priceReasons.risks.some((r) => r.id === 'accident'));
+    assert.ok(a.warnings.some((w) => w.includes('Accident')));
+  });
+
+  it('les négations ne comptent pas (« aucun accident »)', () => {
+    const a = score({ price: 5000, marketPrice: 8000, description: 'Aucun accident, carnet complet.' });
+    assert.equal(a.priceReasons.risks.length, 0);
+    assert.equal(a.masterclass, true);
+  });
+
+  it('sans raison donnée : demander pourquoi', () => {
+    const a = score({ price: 5000, marketPrice: 8000, description: 'Très bon état.' });
+    assert.ok(a.priceReasons.reasons.some((r) => r.includes('demander au vendeur')));
+  });
+});
