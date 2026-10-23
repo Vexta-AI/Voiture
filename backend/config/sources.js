@@ -10,6 +10,7 @@
  * La zone prioritaire passe par le paramètre "locations" (centre GPS + rayon) : voir lbcLocation.
  */
 
+import { cleanModel } from '../pipeline/normalize.js';
 import { AUTO_TARGETS, BUDGETS, MOTO_TARGETS } from './rules.js';
 
 export const APIFY_ACTOR_ID = 'bovi~leboncoin-listings';
@@ -172,21 +173,33 @@ export function defaultSources(options = {}) {
 export const ONDEMAND_PREFIX = 'ondemand-';
 
 /**
- * Recherche de comparables pour un modèle précis, France entière : lancée quand une annonce fraîche
- * n'a pas assez de comparables pour être cotée.
- * @param {{ type: 'auto'|'moto', brand: string, model: string }} listing
+ * Recherche de comparables pour un modèle précis, France entière, ciblée sur l'âge et le kilométrage
+ * de l'annonce (années ±2, kilométrage proche) : les 10 résultats du plan gratuit deviennent tous
+ * des comparables utilisables. Lancée quand une annonce fraîche n'a pas de cote.
+ * @param {{ type: 'auto'|'moto', brand: string, model: string, year: number, mileage?: number }} listing
  * @param {{ maxItems?: number }} [options]
  * @returns {HuntSource}
  */
 export function ondemandSource(listing, options = {}) {
-  const model = String(listing.model).replace(/_/g, ' ').replace(/\bmod[eè]les?\s+all\b|\bmodel\s+all\b/gi, '');
-  const searchText = `${listing.brand} ${model}`.toLowerCase().replace(/\s+/g, ' ').trim();
+  const searchText = `${listing.brand} ${cleanModel(listing.model, listing.brand) ?? ''}`.toLowerCase().replace(/\s+/g, ' ').trim();
   const { min, max } = BUDGETS[listing.type];
+  const params = new URLSearchParams({
+    category: LBC_CATEGORY[listing.type],
+    text: searchText,
+    price: `${Math.round(min * 0.6)}-${Math.round(max * 1.3)}`,
+    regdate: `${listing.year - 2}-${listing.year + 2}`,
+  });
+  if (listing.mileage) {
+    const spread = Math.max(30000, listing.mileage * 0.6);
+    params.set('mileage', `${Math.max(0, Math.round((listing.mileage - spread) / 1000) * 1000)}-${Math.round((listing.mileage + spread) / 1000) * 1000}`);
+  }
+  // Une recherche par modèle et par génération (tranche de 4 ans) : délai de relance commun.
+  const slug = searchText.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
   return {
-    key: `${ONDEMAND_PREFIX}${listing.type}-${searchText.replace(/[^a-z0-9]+/gi, '-')}`.slice(0, 64),
+    key: `${ONDEMAND_PREFIX}${listing.type}-${slug}`.slice(0, 58) + `-${Math.floor(listing.year / 4) * 4}`,
     kind: 'market',
     type: listing.type,
-    input: { searchText, category: LBC_CATEGORY[listing.type], priceMin: Math.round(min * 0.6), priceMax: Math.round(max * 1.3), maxItems: options.maxItems ?? HUNT_LIMITS.marketMaxItems },
+    input: { searchUrl: `https://www.leboncoin.fr/recherche?${params.toString()}`, maxItems: options.maxItems ?? HUNT_LIMITS.marketMaxItems },
   };
 }
 
