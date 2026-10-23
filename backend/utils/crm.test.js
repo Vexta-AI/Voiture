@@ -16,6 +16,10 @@ import {
   nextAction,
 } from './crm.js';
 import { scoreListing } from './scoring.js';
+import { BUSINESS } from '../config/rules.js';
+
+// Formule de base testée hors cotisations micro (testées à part).
+BUSINESS.status = 'particulier';
 
 const NOW = new Date('2026-10-22T12:00:00Z');
 const H = 3_600_000;

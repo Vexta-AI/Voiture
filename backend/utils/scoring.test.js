@@ -6,6 +6,10 @@ import { generateMandateMessage, generateNegotiationMessage, negotiationBounds, 
 import { buildOutreachPayload, eligibleStrategies } from './outreach.js';
 import { REGISTRATION } from '../config/rules.js';
 import { classifySegment, priceBand, registrationCost, scoreListing } from './scoring.js';
+import { BUSINESS } from '../config/rules.js';
+
+// Formule de base testée hors cotisations micro (testées à part).
+BUSINESS.status = 'particulier';
 
 const NOW = new Date('2026-10-22T12:00:00Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -405,5 +409,23 @@ describe('Réalité du marché', () => {
     assert.ok(!score(stats(60)).insights.some((i) => i.startsWith('Marché lent')));
     assert.ok(score(stats(95)).insights.some((i) => i.startsWith('Marché lent')));
     assert.ok(!score({ ...stats(120), title: 'Renault Zoe électrique' }).insights.some((i) => i.startsWith('Marché lent')));
+  });
+});
+
+describe('Micro-entreprise', () => {
+  it('cotisations 12,3 % du prix de revente (sur le CA, pas la marge)', () => {
+    BUSINESS.status = 'micro';
+    try {
+      const a = score({ price: 6000, marketPrice: 9000 });
+      assert.equal(a.finance.socialCharges, 1107);
+      const old = new Date(NOW.getTime() - 20 * DAY_MS).toISOString();
+      const m = score({ price: 6000, marketPrice: 7500, publishedAt: old }).mandate;
+      // commission 1 500 + upsells facturés 330 → 21,2 %
+      assert.equal(m?.socialCharges, Math.round((1500 + 330) * 0.212));
+      assert.equal(m?.totalRevenue, (m?.grossRevenue ?? 0) - (m?.socialCharges ?? 0));
+    } finally {
+      BUSINESS.status = 'particulier';
+    }
+    assert.equal(score({ price: 6000, marketPrice: 9000 }).finance.socialCharges, 0);
   });
 });

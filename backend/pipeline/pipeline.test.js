@@ -9,6 +9,10 @@ import { estimateMarketPrice, modelKey, variantOf } from './market.js';
 import { normalizeApifyItem, toInt } from './normalize.js';
 import { scoreListing } from '../utils/scoring.js';
 import { formatTelegramAlert, sendTelegram } from './telegram.js';
+import { BUSINESS } from '../config/rules.js';
+
+// Formule de base testée hors cotisations micro (testées à part).
+BUSINESS.status = 'particulier';
 
 const NOW = new Date('2026-10-22T12:00:00Z');
 const daysAgo = (n) => new Date(NOW.getTime() - n * 86_400_000).toISOString();

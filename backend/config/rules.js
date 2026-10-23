@@ -26,6 +26,18 @@ export const COSTS = {
 };
 
 /**
+ * Statut d'exploitation. En micro-entreprise, les cotisations sociales se calculent sur le CHIFFRE
+ * D'AFFAIRES encaissé (le prix de revente entier), pas sur la marge (economie.gouv.fr, 2026) :
+ * 12,3 % en achat-revente de marchandises, 21,2 % sur les prestations commerciales (commission de mandat, upsells).
+ * 'particulier' : pas de cotisation, mais l'achat-revente habituel est une activité commerciale à déclarer.
+ */
+export const BUSINESS = {
+  status: /** @type {'particulier'|'micro'} */ ('micro'),
+  salesSocialRate: 0.123,
+  servicesSocialRate: 0.212,
+};
+
+/**
  * Frais de détention et de revente (en plus de la carte grise et du rapatriement) :
  * - assurance temporaire le temps de garder la voiture : ~158-210 € les 30 jours, soit ~6 €/jour
  *   (comparateurs d'assurance temporaire, 2026) ; durée = délai de vente du marché, entre 30 et 90 jours ;
