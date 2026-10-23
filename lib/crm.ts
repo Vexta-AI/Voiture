@@ -10,7 +10,11 @@ export interface WaitingBuyer {
   id: string;
   name: string;
   phone?: string;
+  email?: string;
   channel?: string;
+  /** Origine : saisi à la main, ou formulaire public (avec consentement daté). */
+  source?: 'manuel' | 'formulaire';
+  consentAt?: string;
   active: boolean;
   createdAt: string;
   notes?: string;

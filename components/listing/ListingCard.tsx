@@ -89,6 +89,11 @@ export function ListingCard({
                 👥 {buyers.length} acheteur{buyers.length > 1 ? 's' : ''}
               </Chip>
             )}
+            {listing.repost && (
+              <Chip tone="amber" title={`Même voiture déjà en ligne depuis le ${new Date(listing.repost.firstSeenAt).toLocaleDateString('fr-FR')}`}>
+                🔁 Republiée
+              </Chip>
+            )}
             {listing.priceDrop && (
               <Chip tone="red" title={`Relevé par le radar : ${eur(listing.priceDrop.from)} → ${eur(listing.priceDrop.to)}`}>
                 📉 −{eur(listing.priceDrop.amount)}

@@ -179,6 +179,10 @@ Chaque personne qui te dit ce qu'elle cherche (modèles, budget max, année min,
 - dans les alertes Telegram (« Acheteur(s) prêt(s) ») ;
 - dans l'onglet Acheteurs, sur les voitures du CRM, avec le message prêt et la création de la fiche acheteur en un clic.
 
+**Formulaire public `/cherche`** (sans mot de passe) : les acheteurs laissent eux-mêmes leurs critères et leurs coordonnées, avec une case de consentement obligatoire (date enregistrée). Ils rejoignent le réseau et tu reçois une notification Telegram. Variables optionnelles : `PUBLIC_BRAND` (ton nom commercial, affiché comme responsable) et `PUBLIC_CONTACT` (e-mail ou téléphone pour les demandes de suppression). On ne collecte jamais de coordonnées sur des forums ou des réseaux sociaux : la CNIL exige le consentement avant tout démarchage ([CNIL](https://www.cnil.fr/fr/la-reutilisation-des-donnees-publiquement-accessibles-en-ligne-des-fins-de-demarchage-commercial)).
+
+**Annonces republiées** : un vendeur qui supprime et remet son annonce pour paraître récente est repéré grâce à l'empreinte du véhicule (même modèle, même année, km à 2 000 près, même code postal). Le temps en ligne repart de la première annonce, ce qui compte pour le levier de négociation et le mandat J+15, et la carte affiche « 🔁 Republiée ».
+
 ## Apprentissage (`/crm` → 📈 Apprentissage)
 
 Chaque deal mené dans le CRM mesure la réalité, à comparer aux hypothèses du radar :

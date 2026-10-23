@@ -40,6 +40,7 @@ describe('Réseau d’acheteurs', () => {
       ok: true,
       name: 'Karim',
       phone: undefined,
+      email: undefined,
       notes: undefined,
       criteria: { type: 'auto', models: ['clio', '208'], budgetMax: 9000, budgetMin: undefined, yearMin: undefined, mileageMax: undefined, fuel: 'diesel', gearbox: undefined },
     });

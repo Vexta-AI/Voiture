@@ -85,6 +85,10 @@ export function BuyersView({ deals, onAddBuyerDeal }: { deals: Deal[]; onAddBuye
           Note ici chaque personne qui te dit ce qu&apos;elle cherche : un acheteur qui n&apos;a pas pris ta voiture, un ami, un contact. Quand le radar ou le CRM trouve une voiture qui
           lui correspond, tu le vois sur la carte et dans l&apos;alerte Telegram, avec le message prêt à lui envoyer. Tu achètes une voiture déjà presque vendue.
         </p>
+        <p className="mt-2">
+          Ton formulaire public à partager (groupes Facebook, annonces, Instagram) : <a className="font-medium text-sky-700 underline dark:text-sky-400" href="/cherche" target="_blank" rel="noreferrer">/cherche</a>. Les
+          personnes s&apos;inscrivent elles-mêmes, avec leur consentement.
+        </p>
       </div>
 
       <section className="card space-y-2 p-4">
@@ -129,6 +133,12 @@ export function BuyersView({ deals, onAddBuyerDeal }: { deals: Deal[]; onAddBuye
                   <div>
                     <p className="font-semibold text-ink-900">
                       {b.name} {b.phone && <span className="text-xs font-normal text-ink-500">· {b.phone}</span>}
+                      {b.email && <span className="text-xs font-normal text-ink-500"> · {b.email}</span>}
+                      {b.source === 'formulaire' && (
+                        <span className="ml-1.5 rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-medium text-sky-800 dark:bg-sky-500/10 dark:text-sky-300" title={b.consentAt ? `Consentement le ${new Date(b.consentAt).toLocaleDateString('fr-FR')}` : undefined}>
+                          formulaire
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-ink-600">
                       {c.models?.length ? c.models.join(', ') : 'tout modèle'} · budget {eur(c.budgetMax)}
