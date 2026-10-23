@@ -39,7 +39,9 @@ export function priceListings(listings, pool) {
  */
 export function ondemandCandidates(missing, { max, skip = new Set() }) {
   const inBudget = (l) => l.price >= BUDGETS[l.type].min && l.price <= BUDGETS[l.type].max;
-  const sorted = missing.filter(inBudget).sort((a, b) => (a.zone === 'france' ? 1 : 0) - (b.zone === 'france' ? 1 : 0) || (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
+  // Modèle "Autres" (non listé par LeBonCoin) : aucune recherche de comparables possible.
+  const known = (l) => !/^autres?$/i.test(String(l.model).trim());
+  const sorted = missing.filter((l) => inBudget(l) && known(l)).sort((a, b) => (a.zone === 'france' ? 1 : 0) - (b.zone === 'france' ? 1 : 0) || (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
   const picked = new Map();
   for (const listing of sorted) {
     const source = ondemandSource(listing);

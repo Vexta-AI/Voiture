@@ -52,6 +52,22 @@ function withGeneration(model, title, year) {
   return model;
 }
 
+/**
+ * Nettoie le modèle renvoyé par LeBonCoin : "Tiguan_model_all" / "Tiguan model all" -> "Tiguan",
+ * marque répétée retirée ; "Autres" (modèle non listé) -> null.
+ */
+export function cleanModel(model, brand) {
+  let m = String(model ?? '')
+    .replace(/_/g, ' ')
+    .replace(/\bmod[eè]les?\s+all\b|\bmodel\s+all\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const b = normalize(brand);
+  if (b && normalize(m).startsWith(`${b} `)) m = m.slice(b.length).trim();
+  if (!m || /^autres?$/i.test(normalize(m))) return null;
+  return m;
+}
+
 const capitalize = (s) => s.replace(/(^|[\s-])([a-zà-ÿ])/g, (_, sep, c) => sep + c.toUpperCase());
 
 /**
@@ -70,6 +86,7 @@ export function normalizeApifyItem(item, context) {
 
   let brand = attr(item, 'vehicle_brand', 'brand', 'moto_brand', 'u_moto_brand', 'u_car_brand');
   let model = attr(item, 'vehicle_model', 'model', 'moto_model', 'u_moto_model', 'u_car_model');
+  model = model ? cleanModel(model, brand) ?? undefined : undefined;
   if (!brand || !model) {
     const inferred = inferFromTargets(context.type, title);
     if (!inferred) return { ok: false, reason: 'modèle non identifié', id: String(id) };

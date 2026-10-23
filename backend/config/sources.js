@@ -179,7 +179,8 @@ export const ONDEMAND_PREFIX = 'ondemand-';
  * @returns {HuntSource}
  */
 export function ondemandSource(listing, options = {}) {
-  const searchText = `${listing.brand} ${listing.model}`.toLowerCase().replace(/\s+/g, ' ').trim();
+  const model = String(listing.model).replace(/_/g, ' ').replace(/\bmod[eè]les?\s+all\b|\bmodel\s+all\b/gi, '');
+  const searchText = `${listing.brand} ${model}`.toLowerCase().replace(/\s+/g, ' ').trim();
   const { min, max } = BUDGETS[listing.type];
   return {
     key: `${ONDEMAND_PREFIX}${listing.type}-${searchText.replace(/[^a-z0-9]+/gi, '-')}`.slice(0, 64),
