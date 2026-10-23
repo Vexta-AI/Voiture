@@ -83,6 +83,15 @@ export function generateNegotiationMessage(listing, analysis, options = {}) {
     lines.push('');
   }
 
+  // Argument chiffré et vérifiable : le bas du marché des annonces réellement comparées.
+  const stats = listing.marketStats;
+  if (stats && stats.comparables >= 4 && stats.low < listing.price) {
+    lines.push(
+      `Sur les ${stats.comparables} annonces équivalentes que j'ai comparées (même motorisation, année et kilométrage proches), une bonne partie est affichée autour de ${eur(stats.low)}.`,
+    );
+    lines.push('');
+  }
+
   if (analysis.puretechCondition) {
     lines.push(
       'Le 1.2 PureTech impose aussi une vigilance particulière sur la courroie de distribution : pourriez-vous me transmettre la facture de remplacement courroie + crépine ?',

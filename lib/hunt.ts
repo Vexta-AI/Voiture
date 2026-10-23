@@ -3,6 +3,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 
 import { getDatasetItems, getRun, isCapacityError, startRun } from '@/backend/pipeline/apify.js';
+import { priceHistory, withPriceDrop } from '@/backend/pipeline/history.js';
 import { ondemandCandidates, priceListings, selectAlerts } from '@/backend/pipeline/hunt.js';
 import { filterArea } from '@/backend/pipeline/geo.js';
 import { dedupeById } from '@/backend/pipeline/market.js';
@@ -283,8 +284,12 @@ export async function ingestRun(runId: string, sourceKey: string) {
   // Mandat (stale) : zone prioritaire uniquement ; achat-revente : France entière, zone prioritaire d'abord.
   const { kept, stats } = filterArea(listings, area, { national: source.kind !== 'stale' });
   Object.assign(summary, { area: stats });
-  const { pool: stock } = await pool();
-  const { priced, unpriced, missing } = priceListings(kept, stock, { base: area });
+  const { runs: stored, pool: stock } = await pool();
+  // Baisse de prix depuis un relevé précédent : vendeur motivé, nouvelle alerte (la clé d'alerte inclut le prix).
+  const history = priceHistory(stored, { excludeRunId: runId });
+  const tracked = kept.map((l) => withPriceDrop(l, history));
+  Object.assign(summary, { priceDrops: tracked.filter((l) => 'priceDrop' in l).length });
+  const { priced, unpriced, missing } = priceListings(tracked, stock, { base: area });
   summary.priced = priced.length;
   summary.unpriced = unpriced;
   await alertOn(config, priced, summary);
@@ -302,7 +307,9 @@ async function computeLive() {
   const pool = dedupeById(runs.flatMap((r) => r.listings));
   const recentSince = Date.now() - 3 * 86_400_000;
   const recentAll = dedupeById(runs.filter((r) => r.kind !== 'market' && new Date(r.fetchedAt).getTime() >= recentSince).flatMap((r) => r.listings));
-  const recent = filterArea(recentAll, huntConfig().area ?? DEFAULT_AREA).kept;
+  // Prix actuel = dernier relevé ; baisse = écart avec le plus haut prix déjà vu.
+  const history = priceHistory(runs);
+  const recent = filterArea(recentAll, huntConfig().area ?? DEFAULT_AREA).kept.map((l) => withPriceDrop(l, history));
   const { priced, unpriced, missing } = priceListings(recent, pool, { base: huntConfig().area ?? DEFAULT_AREA });
   const lastRun = runs.filter((r) => r.kind !== 'market').at(-1)?.fetchedAt ?? null;
   // Annonces réelles encore sans cote : affichées à part (cote à saisir), zone prioritaire d'abord.

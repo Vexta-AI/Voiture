@@ -106,6 +106,7 @@ export function buildOutreachPayload(listing, analysis, options = {}) {
       location: listing.location ?? null,
       source: listing.source ?? null,
       url: adUrl(listing),
+      priceDrop: listing.priceDrop ?? null,
     },
     scoring: {
       status: analysis.status.key,

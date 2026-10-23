@@ -38,6 +38,8 @@ export interface Listing {
   localMarket?: { price: number; low: number; high: number; comparables: number; daysOnMarket: number | null; radiusKm: number; criteria?: string[] };
   /** Cote Argus saisie à la main (pas d'accès gratuit à l'Argus officiel) */
   argusPrice?: number;
+  /** Baisse de prix relevée par le radar (plus haut prix déjà vu -> prix actuel) */
+  priceDrop?: { from: number; to: number; amount: number; since: string };
   /** Photos de l'annonce (URL) */
   photos?: string[];
   /** Puissance fiscale (CV) : base de la carte grise */

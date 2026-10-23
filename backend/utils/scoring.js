@@ -69,6 +69,7 @@ import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplaceme
  * @property {{ low: number, high: number, comparables: number, daysOnMarket: number|null, criteria?: string[] }} [marketStats] marché actuel (comparables)
  * @property {{ price: number, low: number, high: number, comparables: number, daysOnMarket: number|null, radiusKm: number }} [localMarket] revente chez toi
  * @property {number} [argusPrice]    cote Argus saisie à la main
+ * @property {{ from: number, to: number, amount: number, since: string }} [priceDrop] baisse relevée par le radar
  * @property {string[]} [photos]    photos de l'annonce
  * @property {number} [fiscalHp]       puissance fiscale (CV), base de la carte grise
  * @property {string} [vin]
@@ -385,6 +386,11 @@ export function priceReasons(listing, text, online, now = new Date()) {
       return evidence ? [{ id: r.id, label: r.label, evidence }] : [];
     });
   const motivated = hits(PRICE_SIGNALS.motivated);
+  // Baisse de prix relevée par le radar : le signal le plus fiable d'un vendeur qui veut vendre.
+  if (listing.priceDrop) {
+    const since = new Date(listing.priceDrop.since).toLocaleDateString('fr-FR');
+    motivated.unshift({ id: 'baisse', label: 'Prix déjà baissé', evidence: `${listing.priceDrop.from.toLocaleString('fr-FR')} € → ${listing.priceDrop.to.toLocaleString('fr-FR')} € depuis le ${since}` });
+  }
   const risks = hits(PRICE_SIGNALS.risks);
   const reasons = [];
   if (gapRate >= PRICE_SIGNALS.bigGapRate) reasons.push(`${Math.round(gapRate * 100)} % sous la cote du marché.`);
