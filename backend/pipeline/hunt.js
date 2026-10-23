@@ -27,7 +27,10 @@ export function priceListings(listings, pool) {
       missing.push(listing);
       continue;
     }
-    priced.push({ listing: { ...listing, marketPrice: market.price }, market });
+    priced.push({
+      listing: { ...listing, marketPrice: market.price, marketStats: { low: market.low, high: market.high, comparables: market.comparables, daysOnMarket: market.daysOnMarket } },
+      market,
+    });
   }
   return { priced, unpriced: missing.length, missing };
 }

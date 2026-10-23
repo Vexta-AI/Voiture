@@ -82,7 +82,14 @@ export function estimateMarketPrice(listing, pool) {
       prices = prices.slice(cut, prices.length - cut);
     }
     const round = (n) => Math.round(n / MARKET_RULES.step) * MARKET_RULES.step;
+    // Délai de vente : depuis combien de jours les comparables sont en ligne (médiane).
+    const now = Date.now();
+    const days = comps
+      .map((p) => Math.floor((now - new Date(p.publishedAt).getTime()) / 86_400_000))
+      .filter((d) => Number.isFinite(d) && d >= 0)
+      .sort((a, b) => a - b);
     return {
+      daysOnMarket: days.length ? Math.round(quantile(days, 0.5)) : null,
       price: round(quantile(prices, 0.5)),
       comparables: comps.length,
       window: w.label,
