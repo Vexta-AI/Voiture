@@ -314,11 +314,16 @@ describe('Comparables à la demande', () => {
       mk('5', 'Skoda', 'Fabia', { zone: 'prioritaire', distanceKm: 90 }),
     ];
     const picked = ondemandCandidates(missing, { max: 2 });
-    assert.deepEqual(picked.map((s) => s.input.searchText), ['kia ceed', 'skoda fabia']);
+    const text = (src) => new URL(src.input.searchUrl).searchParams.get('text');
+    assert.deepEqual(picked.map(text), ['kia ceed', 'skoda fabia']);
+    const url = new URL(picked[0].input.searchUrl);
+    assert.equal(url.searchParams.get('regdate'), '2016-2020', 'années ±2');
+    assert.equal(url.searchParams.get('mileage'), '32000-128000');
     assert.equal(picked[0].kind, 'market');
     assert.ok(picked[0].key.startsWith('ondemand-auto-'));
     const skip = new Set([ondemandSource(missing[1]).key]);
-    assert.deepEqual(ondemandCandidates(missing, { max: 2, skip }).map((s) => s.input.searchText), ['skoda fabia', 'seat ibiza']);
+    assert.deepEqual(ondemandCandidates(missing, { max: 2, skip }).map(text), ['skoda fabia', 'seat ibiza']);
+    assert.equal(ondemandCandidates([mk('6', 'Bmw', 'Autres model all')], { max: 2 }).length, 0, 'modèle non listé');
   });
 });
 
@@ -333,6 +338,6 @@ describe('Modèles LeBonCoin', () => {
     assert.equal(cleanModel('Autres', 'Opel'), null);
     const a = { type: 'auto', brand: 'Volkswagen', model: 'Tiguan model all', title: 'Tiguan' };
     assert.equal(modelKey(a), modelKey({ ...a, model: 'Tiguan' }), 'anciens stocks comparables');
-    assert.equal(ondemandSource(a).input.searchText, 'volkswagen tiguan');
+    assert.equal(new URL(ondemandSource({ ...a, year: 2018 }).input.searchUrl).searchParams.get('text'), 'volkswagen tiguan');
   });
 });
