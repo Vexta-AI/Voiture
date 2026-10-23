@@ -60,8 +60,10 @@ describe('Formule financière', () => {
 
   it('calcule le scénario négocié avec le coût réel des défauts', () => {
     const a = score({ description: 'Petite rayure sur la portière.' });
-    assert.equal(a.finance.targetPrice, 6000 - 300);
-    assert.equal(a.finance.negotiatedNetMargin, 7000 - 5700 - 700 - 90 - 304 - 260);
+    // Prix cible = l'offre envoyée : remise plancher de 800 € (> 10 % et > leviers de 300 €).
+    assert.equal(a.finance.targetPrice, 6000 - 800);
+    assert.equal(a.finance.negotiatedNetMargin, 7000 - 5200 - 700 - 90 - 304 - 260);
+    assert.equal(a.finance.targetPrice, generateNegotiationMessage(base({ description: 'Petite rayure sur la portière.' }), a).offer);
   });
 
   it('déduit la carte grise de la marge réelle (5 CV × 58 € + 13,76 €)', () => {
@@ -427,5 +429,18 @@ describe('Micro-entreprise', () => {
       BUSINESS.status = 'particulier';
     }
     assert.equal(score({ price: 6000, marketPrice: 9000 }).finance.socialCharges, 0);
+  });
+});
+
+describe('Corrections de cohérence (validées)', () => {
+  it('revente locale : cotisations micro calculées sur le prix local', () => {
+    BUSINESS.status = 'micro';
+    try {
+      const a = score({ price: 6000, marketPrice: 8000, localMarket: { price: 9000, low: 8800, high: 9200, comparables: 4, daysOnMarket: null, radiusKm: 100 } });
+      const purchaseNoCharges = a.finance.transportCost + a.finance.registrationCost + a.finance.ownership.total;
+      assert.equal(a.local?.margin, 9000 - 6000 - 700 - purchaseNoCharges - Math.round(9000 * 0.123));
+    } finally {
+      BUSINESS.status = 'particulier';
+    }
   });
 });

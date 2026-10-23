@@ -44,6 +44,7 @@ import {
   VALUE_TRIGGERS,
 } from '../config/rules.js';
 import { distanceKm as gpsDistanceKm } from '../pipeline/geo.js';
+import { offerPriceFor } from './messages.js';
 import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplacement } from './text.js';
 
 /**
@@ -533,7 +534,8 @@ export function scoreListing(listing, options = {}) {
   // --- Scénario négocié (leviers + coût réel des défauts) ---
   const leversTotal = levers.reduce((sum, l) => sum + l.discount, 0);
   const leversRealCost = levers.reduce((sum, l) => sum + l.realCost, 0);
-  const targetPrice = Math.max(0, askingPrice - leversTotal);
+  // Prix cible = l'offre réellement envoyée au vendeur (même calcul que le message de négo).
+  const targetPrice = offerPriceFor({ price: askingPrice, leversTotal, daysOnline: online, puretechMaxBuy: blacklist.puretechCondition?.maxBuyPrice ?? null });
   const negotiatedNetMargin = marketPrice - targetPrice - fixedCosts - leversRealCost - purchaseCosts;
   /** Prix d'achat maximum pour atteindre le seuil PÉPITE (marge réelle strictement supérieure au seuil). */
   const maxBuyPriceForPepite = marketPrice - fixedCosts - threshold - 1 - purchaseCosts;
@@ -608,7 +610,9 @@ export function scoreListing(listing, options = {}) {
   }
   // Revente chez toi : la marge réelle si tu revends au prix des annonces de ta zone.
   const local = listing.localMarket ?? null;
-  const localMargin = local ? local.price - askingPrice - fixedCosts - purchaseCosts : null;
+  // Cotisations micro recalculées sur le prix de revente local (elles portent sur le CA réellement encaissé).
+  const localSocialCharges = local && BUSINESS.status === 'micro' ? Math.round(local.price * BUSINESS.salesSocialRate) : socialCharges;
+  const localMargin = local ? local.price - askingPrice - fixedCosts - (purchaseCosts - socialCharges + localSocialCharges) : null;
   // Marge prudente : ton acheteur négociera aussi (3 à 8 % selon le secteur) sur le prix de revente.
   const resaleBase = local?.price ?? marketPrice;
   const buyerDiscount = Math.round((resaleBase * MARKET_TRUTH.buyerDiscountRate) / 50) * 50;
@@ -652,7 +656,8 @@ export function scoreListing(listing, options = {}) {
     const qualityPts = quality.points;
     const liquidityPts = listing.type === 'auto' && segment === 'citadine' && (listing.doors ?? 5) >= 5 ? 5 : listing.type === 'moto' && triggers.some((t) => t.id === MOTO_A2.id) ? 5 : 0;
     // Le rapatriement est déjà déduit de la marge : son avertissement ne pénalise pas deux fois.
-    let penalties = (warnings.length - (geo.zone === 'france' ? 1 : 0)) * 5;
+    // Idem pour le hors budget : son avertissement ne compte pas, seule la pénalité de 10 points s'applique.
+    let penalties = (warnings.length - (geo.zone === 'france' ? 1 : 0) - (inBudget ? 0 : 1)) * 5;
     if (puretechOverpriced) penalties += 15;
     if (!inBudget) penalties += 10;
     score = Math.round(clamp(marginPts + triggerPts + leverPts + agePts + ruralPts + qualityPts + liquidityPts - penalties, 0, 100));

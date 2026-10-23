@@ -178,3 +178,18 @@ describe('Vue d’ensemble', () => {
     assert.equal(dailyDigest([], { now: NOW }), null);
   });
 });
+
+describe('Cotisations micro dans le CRM', () => {
+  it('déduit 12,3 % du prix de revente (achat) et 21,2 % du facturé (mandat), comme le scoring', () => {
+    BUSINESS.status = 'micro';
+    try {
+      const achat = { kind: 'achat', numbers: { purchasePrice: 6700, soldPrice: 9300, reconditioning: 500, registrationCost: 304, ownershipCost: 260 } };
+      const money = dealEconomics(/** @type {any} */ (achat));
+      assert.equal(money.realized, 9300 - 6700 - 500 - 304 - 260 - Math.round(9300 * 0.123));
+      const mandat = { kind: 'mandat', numbers: { ownerNet: 8000, listedPrice: 9000, upsellMargin: 100, upsellBilled: 300 } };
+      assert.equal(dealEconomics(/** @type {any} */ (mandat)).expected, 9000 - 8000 + 100 - Math.round((1000 + 300) * 0.212));
+    } finally {
+      BUSINESS.status = 'particulier';
+    }
+  });
+});
