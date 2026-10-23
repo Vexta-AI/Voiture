@@ -7,8 +7,8 @@
  *   3. Défauts détectés -> leviers de négociation (baisse de prix argumentée)
  *   4. Formule financière :
  *        Marge Brute  = Cote Marché Pro (+ bonus options) - Prix Affiché
- *        Marge Nette  = Marge Brute - 350 € (remise en état) - 200 € (capital risque)
- *        Marge réelle = Marge Nette - rapatriement (hors zone) - carte grise (achat en particulier)
+ *        Marge Nette  = Marge Brute - 500 € (remise en état) - 200 € (capital risque)
+ *        Marge réelle = Marge Nette - carte grise - assurance temporaire - annonce - trajet / rapatriement
  *   5. Statut : 🔥 PÉPITE POTENTIELLE / A SURVEILLER / REFUSE
  *   6. Éligibilité Dépôt-Vente / Mandat (annonce en ligne depuis plus de 14 jours)
  *
@@ -28,6 +28,7 @@ import {
   MOTO_A2,
   MOTO_TARGETS,
   NEGOTIATION_LEVERS,
+  OWNERSHIP_COSTS,
   MARKET_TRUTH,
   MASTERCLASS,
   PRICE_BANDS,
@@ -433,6 +434,20 @@ export function areaType(listing) {
 }
 
 /**
+ * Frais de détention et de revente : assurance pendant le délai de vente, annonce, déplacement.
+ * @returns {{ insurance: number, holdingDays: number, adFee: number, visit: number, total: number }}
+ */
+export function ownershipCosts(listing, geo) {
+  const days = listing.marketStats?.daysOnMarket ?? OWNERSHIP_COSTS.minHoldingDays;
+  const holdingDays = clamp(Math.round(days), OWNERSHIP_COSTS.minHoldingDays, OWNERSHIP_COSTS.maxHoldingDays);
+  const insurance = Math.round((holdingDays * OWNERSHIP_COSTS.insurancePerDay) / 10) * 10;
+  // Hors zone, le rapatriement couvre déjà le voyage.
+  const visit = geo.zone === 'prioritaire' && geo.distanceKm ? Math.round((geo.distanceKm * 2 * OWNERSHIP_COSTS.visitPerKm) / 10) * 10 : 0;
+  const adFee = OWNERSHIP_COSTS.adFee;
+  return { insurance, holdingDays, adFee, visit, total: insurance + adFee + visit };
+}
+
+/**
  * Coût de la carte grise à l'achat : chevaux fiscaux × tarif régional (÷ 2 au-delà de 10 ans) + frais fixes.
  * 0 € en statut pro (déclaration d'achat + W garage).
  * @returns {{ cost: number, cv: number, estimatedCv: boolean, halved: boolean, status: 'particulier'|'pro' }}
@@ -483,7 +498,8 @@ export function scoreListing(listing, options = {}) {
   const geo = logistics(listing);
   const registration = registrationCost(listing, segment, now);
   const registrationFee = registration.cost;
-  const purchaseCosts = geo.transportCost + registrationFee;
+  const ownership = ownershipCosts(listing, geo);
+  const purchaseCosts = geo.transportCost + registrationFee + ownership.total;
   /** Ce qui reste vraiment dans la poche : la base du statut PÉPITE. */
   const realNetMargin = netMargin - purchaseCosts;
 
@@ -651,6 +667,7 @@ export function scoreListing(listing, options = {}) {
       netMarginWithOptions,
       transportCost: geo.transportCost,
       registrationCost: registrationFee,
+      ownership,
       registration,
       realNetMargin,
       reconditioning: COSTS.RECONDITIONING_BASE,

@@ -13,7 +13,7 @@ function Row({ label, value, strong, muted, hint }: { label: string; value: stri
   );
 }
 
-/** Détail de la formule : Marge Brute - 350 € - 200 € = Marge Nette, + scénario négocié. */
+/** Détail de la formule : Marge Brute - 500 € - 200 € = Marge Nette, puis frais réels = Marge réelle, + scénario négocié. */
 export function MarginBreakdown({ analysis }: { analysis: Analysis }) {
   const f = analysis.finance;
   return (
@@ -37,7 +37,12 @@ export function MarginBreakdown({ analysis }: { analysis: Analysis }) {
             hint={`${f.registration.cv} CV${f.registration.estimatedCv ? ' estimés' : ''}${f.registration.halved ? ', −50 % +10 ans' : ''}`}
           />
         )}
-        {f.realNetMargin !== f.netMargin && <Row label="Marge réelle (dans ta poche)" value={signedEur(f.realNetMargin)} strong />}
+        <Row label="Assurance temporaire" value={`− ${eur(f.ownership.insurance)}`} muted hint={`${f.ownership.holdingDays} j à ~6 €/j, le temps de revendre`} />
+        <Row label="Annonce LeBonCoin" value={`− ${eur(f.ownership.adFee)}`} muted hint="79,90 € dès la 3e annonce véhicule de l'année" />
+        {f.ownership.visit > 0 && <Row label="Déplacement" value={`− ${eur(f.ownership.visit)}`} muted hint={`aller-retour ${analysis.distanceKm} km`} />}
+        <div className="mt-1 border-t border-ink-100 pt-1">
+          <Row label="Marge réelle (dans ta poche)" value={signedEur(f.realNetMargin)} strong />
+        </div>
         <Row
           label="Marge prudente"
           value={signedEur(analysis.prudent.margin)}
@@ -53,7 +58,7 @@ export function MarginBreakdown({ analysis }: { analysis: Analysis }) {
         <Row label="Leviers de négo" value={f.leversTotal ? `− ${eur(f.leversTotal)}` : '—'} muted />
         <Row label="Prix d'achat cible" value={eur(f.targetPrice)} />
         <Row label="Coût réel des défauts" value={f.leversRealCost ? `− ${eur(f.leversRealCost)}` : '—'} muted />
-        {f.transportCost + f.registrationCost > 0 && <Row label="Rapatriement + carte grise" value={`− ${eur(f.transportCost + f.registrationCost)}`} muted />}
+        <Row label="Carte grise, assurance, annonce, trajet" value={`− ${eur(f.transportCost + f.registrationCost + f.ownership.total)}`} muted />
         <div className="mt-1 border-t border-ink-100 pt-1">
           <Row label="Marge nette négociée" value={signedEur(f.negotiatedNetMargin)} strong />
         </div>

@@ -95,7 +95,8 @@ export const DOCUMENTS = {
     { id: 'code_cession', label: 'Code de cession ANTS reçu du vendeur' },
     { id: 'entretien', label: "Carnet d'entretien + factures (courroie si PureTech)" },
     { id: 'cles', label: 'Double des clés' },
-    { id: 'immat', label: 'Carte grise à ton nom (ou déclaration d’achat en pro) sous 1 mois' },
+    { id: 'assurance', label: 'Assurance souscrite AVANT de rouler (temporaire OK, sur le VIN avec carte grise barrée + cession)' },
+    { id: 'immat', label: 'Carte grise à ton nom sur l’ANTS avec le code de cession, sous 1 mois (pro : déclaration d’achat + W garage)' },
   ],
   mandat: [
     { id: 'mandat', label: 'Mandat de dépôt-vente signé (prix net, exclusivité 30 j, dédit)' },
@@ -113,7 +114,8 @@ export const DOCUMENTS = {
     { id: 'carte_grise', label: 'Carte grise barrée et signée remise' },
     { id: 'ct', label: 'CT de moins de 6 mois remis' },
     { id: 'non_gage', label: 'Certificat de non-gage remis' },
-    { id: 'declaration', label: 'Cession déclarée sur l’ANTS (sous 15 jours)' },
+    { id: 'declaration', label: 'Cession déclarée sur l’ANTS (sous 15 jours), code de cession donné à l’acheteur' },
+    { id: 'resiliation', label: 'Assurance résiliée le lendemain de la vente' },
   ],
 };
 

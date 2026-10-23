@@ -32,17 +32,17 @@ const base = (overrides = {}) => ({
 const score = (overrides) => scoreListing(base(overrides), { now: NOW });
 
 describe('Formule financière', () => {
-  it('applique Marge Nette = Cote - Prix - 350 - 200', () => {
+  it('applique Marge Nette = Cote - Prix - 500 - 200', () => {
     const a = score({ price: 6000, marketPrice: 8000 });
     assert.equal(a.finance.grossMargin, 2000);
-    assert.equal(a.finance.netMargin, 2000 - 350 - 200);
+    assert.equal(a.finance.netMargin, 2000 - 500 - 200);
   });
 
   it('ne compte JAMAIS le bonus options dans la marge (cote pro seule)', () => {
     const a = score({ description: 'Toit panoramique.' });
     assert.equal(a.finance.triggersBonus, 700);
     assert.equal(a.finance.grossMargin, 7000 - 6000);
-    assert.equal(a.finance.netMargin, 7000 - 6000 - 550);
+    assert.equal(a.finance.netMargin, 7000 - 6000 - 700);
     assert.equal(a.finance.netMarginWithOptions, a.finance.netMargin + 700);
   });
 
@@ -57,14 +57,16 @@ describe('Formule financière', () => {
   it('calcule le scénario négocié avec le coût réel des défauts', () => {
     const a = score({ description: 'Petite rayure sur la portière.' });
     assert.equal(a.finance.targetPrice, 6000 - 300);
-    assert.equal(a.finance.negotiatedNetMargin, 7000 - 5700 - 550 - 90 - 304);
+    assert.equal(a.finance.negotiatedNetMargin, 7000 - 5700 - 700 - 90 - 304 - 260);
   });
 
   it('déduit la carte grise de la marge réelle (5 CV × 58 € + 13,76 €)', () => {
     const a = score({ price: 6000, marketPrice: 8000 });
     assert.equal(a.finance.registrationCost, 304);
-    assert.equal(a.finance.realNetMargin, a.finance.netMargin - 304);
-    assert.equal(a.finance.walkAwayPrice, 8000 - 550 - 304);
+    // + assurance 30 j (180 €) + annonce LeBonCoin (80 €)
+    assert.deepEqual(a.finance.ownership, { insurance: 180, holdingDays: 30, adFee: 80, visit: 0, total: 260 });
+    assert.equal(a.finance.realNetMargin, a.finance.netMargin - 304 - 260);
+    assert.equal(a.finance.walkAwayPrice, 8000 - 700 - 304 - 260);
   });
 });
 
@@ -85,7 +87,7 @@ describe('Carte grise', () => {
     REGISTRATION.status = 'pro';
     try {
       assert.equal(registrationCost(base(), 'citadine', NOW).cost, 0);
-      assert.equal(score({}).finance.realNetMargin, score({}).finance.netMargin);
+      assert.equal(score({}).finance.realNetMargin, score({}).finance.netMargin - score({}).finance.ownership.total);
     } finally {
       REGISTRATION.status = 'particulier';
     }
@@ -94,14 +96,15 @@ describe('Carte grise', () => {
 
 describe('Statuts', () => {
   it('citadine : PÉPITE au-delà de 1 000 € de marge réelle', () => {
-    assert.equal(score({ marketPrice: 7855 }).status.key, 'PEPITE'); // 1305 - 304 de carte grise = 1001
-    assert.equal(score({ marketPrice: 7854 }).status.key, 'SURVEILLER'); // 1000
+    // 8265 - 6000 - 700 - 304 (carte grise) - 260 (assurance + annonce) = 1001
+    assert.equal(score({ marketPrice: 8265 }).status.key, 'PEPITE');
+    assert.equal(score({ marketPrice: 8264 }).status.key, 'SURVEILLER');
   });
 
   it('compacte/premium : PÉPITE au-delà de 2 000 €', () => {
     const golf = { brand: 'Volkswagen', model: 'Golf 7', engine: '1.6 TDI 115' };
-    assert.equal(score({ ...golf, price: 10000, marketPrice: 12000 }).status.key, 'SURVEILLER'); // net 1450
-    assert.equal(score({ ...golf, price: 10000, marketPrice: 13000 }).status.key, 'PEPITE'); // net 2450 - 362 = 2088
+    assert.equal(score({ ...golf, price: 10000, marketPrice: 12000 }).status.key, 'SURVEILLER'); // 1300 - 622
+    assert.equal(score({ ...golf, price: 10000, marketPrice: 13500 }).status.key, 'PEPITE'); // 2800 - 622 = 2178
   });
 
   it('REFUSE quand aucune marge, même négociée', () => {
@@ -265,7 +268,7 @@ describe('Outreach autonome', () => {
   const old = new Date(NOW.getTime() - 20 * DAY_MS).toISOString();
 
   it('PÉPITE récente : négociation, offre ~10 % sous le prix, virement instantané', () => {
-    const listing = base({ price: 6000, marketPrice: 8000, description: 'Rayure sur l’aile, pneus à prévoir.' });
+    const listing = base({ price: 6000, marketPrice: 8500, description: 'Rayure sur l’aile, pneus à prévoir.' });
     const payload = buildOutreachPayload(listing, scoreListing(listing, { now: NOW }), { now: NOW });
     assert.equal(payload.ok, true);
     if (!payload.ok) return;
@@ -343,7 +346,7 @@ describe('Campagne / ville', () => {
 
 describe('Pourquoi ce prix ? / MASTERCLASS', () => {
   it('vendeur pressé + grosse marge sans risque = MASTERCLASS', () => {
-    const a = score({ price: 5000, marketPrice: 8000, description: 'Vente urgente cause départ à l’étranger.' });
+    const a = score({ price: 6000, marketPrice: 10000, description: 'Vente urgente cause départ à l’étranger.' });
     assert.equal(a.status.key, 'PEPITE');
     assert.equal(a.masterclass, true);
     assert.ok(a.priceReasons.motivated.some((m) => m.id === 'urgent'));
@@ -351,20 +354,20 @@ describe('Pourquoi ce prix ? / MASTERCLASS', () => {
   });
 
   it('un défaut caché explique le prix : jamais MASTERCLASS', () => {
-    const a = score({ price: 5000, marketPrice: 8000, description: 'Petit accident sur l’arrière, roule bien.' });
+    const a = score({ price: 6000, marketPrice: 10000, description: 'Petit accident sur l’arrière, roule bien.' });
     assert.equal(a.masterclass, false);
     assert.ok(a.priceReasons.risks.some((r) => r.id === 'accident'));
     assert.ok(a.warnings.some((w) => w.includes('Accident')));
   });
 
   it('les négations ne comptent pas (« aucun accident »)', () => {
-    const a = score({ price: 5000, marketPrice: 8000, description: 'Aucun accident, carnet complet.' });
+    const a = score({ price: 6000, marketPrice: 10000, description: 'Aucun accident, carnet complet.' });
     assert.equal(a.priceReasons.risks.length, 0);
     assert.equal(a.masterclass, true);
   });
 
   it('sans raison donnée : demander pourquoi', () => {
-    const a = score({ price: 5000, marketPrice: 8000, description: 'Très bon état.' });
+    const a = score({ price: 6000, marketPrice: 10000, description: 'Très bon état.' });
     assert.ok(a.priceReasons.reasons.some((r) => r.includes('demander au vendeur')));
   });
 });
