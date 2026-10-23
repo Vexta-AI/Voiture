@@ -25,7 +25,15 @@ export interface Listing {
   options?: string[];
   doors?: number;
   /** Marché actuel : fourchette des comparables (25-75 %), nombre, jours en ligne médians */
-  marketStats?: { low: number; high: number; comparables: number; daysOnMarket: number | null; criteria?: string[] };
+  marketStats?: {
+    low: number;
+    high: number;
+    comparables: number;
+    daysOnMarket: number | null;
+    criteria?: string[];
+    confidence?: { score: number; level: 'haute' | 'moyenne' | 'faible'; spreadPct: number };
+    samples?: { id: string; title: string; price: number; year: number; mileage: number; location: string | null; url: string | null }[];
+  };
   /** Revente chez toi : comparables à moins de 100 km (200 km à défaut) de la base */
   localMarket?: { price: number; low: number; high: number; comparables: number; daysOnMarket: number | null; radiusKm: number; criteria?: string[] };
   /** Cote Argus saisie à la main (pas d'accès gratuit à l'Argus officiel) */

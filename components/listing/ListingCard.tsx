@@ -151,9 +151,25 @@ export function ListingCard({
       )}
 
       {listing.marketStats?.criteria && (
-        <p className="border-b border-ink-100 px-4 py-1.5 text-[11px] text-ink-500" title="Critères des annonces comparables utilisées pour le prix marché">
-          Comparé sur : {listing.marketStats.criteria.join(' · ')}
-        </p>
+        <div className="space-y-1 border-b border-ink-100 px-4 py-1.5 text-[11px] text-ink-500">
+          {listing.marketStats.confidence && (
+            <p>
+              <span
+                className={cn(
+                  'mr-1.5 rounded px-1.5 py-0.5 font-semibold',
+                  listing.marketStats.confidence.level === 'haute' && 'bg-emerald-600 text-white',
+                  listing.marketStats.confidence.level === 'moyenne' && 'bg-amber-500 text-white',
+                  listing.marketStats.confidence.level === 'faible' && 'bg-rose-600 text-white',
+                )}
+                title="Nombre de comparables, dispersion des prix, critères vérifiés, fenêtre serrée ou élargie"
+              >
+                Fiabilité cote : {listing.marketStats.confidence.level} ({listing.marketStats.confidence.score}/100)
+              </span>
+              {listing.marketStats.comparables} annonces, prix dispersés à {listing.marketStats.confidence.spreadPct} %
+            </p>
+          )}
+          <p title="Critères des annonces comparables utilisées pour le prix marché">Comparé sur : {listing.marketStats.criteria.join(' · ')}</p>
+        </div>
       )}
 
       {(analysis.market || analysis.quality.owners !== null) && (
@@ -268,6 +284,32 @@ export function ListingCard({
                     <img src={p} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                   </button>
                 ))}
+              </div>
+            )}
+            {listing.marketStats?.samples && listing.marketStats.samples.length > 0 && (
+              <div className="text-xs">
+                <p className="mb-1 font-semibold text-ink-900">Annonces comparées ({listing.marketStats.comparables}) : vérifie toi-même</p>
+                <ul className="divide-y divide-ink-100 rounded-lg border border-ink-100">
+                  {listing.marketStats.samples.map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-2 px-2 py-1.5">
+                      <span className="min-w-0 truncate text-ink-600">
+                        {c.url ? (
+                          <a href={c.url} target="_blank" rel="noreferrer" className="hover:underline">
+                            {c.title} ↗
+                          </a>
+                        ) : (
+                          c.title
+                        )}
+                        <span className="text-ink-400">
+                          {' '}
+                          · {c.year} · {km(c.mileage)}
+                          {c.location ? ` · ${c.location}` : ''}
+                        </span>
+                      </span>
+                      <strong className="tabular shrink-0 text-ink-900">{eur(c.price)}</strong>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
             {listing.description && <p className="whitespace-pre-line rounded-lg bg-ink-50 p-3 text-xs leading-relaxed text-ink-600">{listing.description}</p>}

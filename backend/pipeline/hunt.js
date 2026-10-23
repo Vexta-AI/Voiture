@@ -32,7 +32,15 @@ export function priceListings(listings, pool, options = {}) {
       listing: {
         ...listing,
         marketPrice: market.price,
-        marketStats: { low: market.low, high: market.high, comparables: market.comparables, daysOnMarket: market.daysOnMarket, criteria: market.criteria },
+        marketStats: {
+          low: market.low,
+          high: market.high,
+          comparables: market.comparables,
+          daysOnMarket: market.daysOnMarket,
+          criteria: market.criteria,
+          confidence: market.confidence,
+          samples: market.samples,
+        },
         ...(local ? { localMarket: { price: local.price, low: local.low, high: local.high, comparables: local.comparables, daysOnMarket: local.daysOnMarket, radiusKm: local.radiusKm, criteria: local.criteria } } : {}),
       },
       market,
@@ -81,7 +89,8 @@ export function selectAlerts(priced, options = {}) {
       return { listing, market, analysis, payload };
     })
     // Un prix sous 50 % de la cote est un signal d'arnaque ou de cote faussée, pas une pépite.
-    .filter((c) => c.payload.ok && c.listing.price >= c.listing.marketPrice * MARKET_RULES.suspiciousRatio)
+    // Cote peu fiable (peu de comparables, prix très dispersés) : jamais d'alerte.
+    .filter((c) => c.payload.ok && c.listing.price >= c.listing.marketPrice * MARKET_RULES.suspiciousRatio && c.market.confidence?.level !== 'faible')
     // Zone prioritaire d'abord, puis le meilleur score.
     .sort((a, b) => (a.analysis.zone === 'france' ? 1 : 0) - (b.analysis.zone === 'france' ? 1 : 0) || b.analysis.score - a.analysis.score)
     .slice(0, options.maxAlerts ?? MAX_ALERTS_PER_RUN)
