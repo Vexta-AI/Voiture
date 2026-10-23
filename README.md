@@ -172,6 +172,13 @@ Le radar remplit le CRM tout seul : chaque PÉPITE ou cible mandat alertée devi
 
 Stockage : Vercel Blob (`crm/deals/<id>.json`). API : `GET/POST /api/crm`, `PATCH/DELETE /api/crm/:id` (protégées par le mot de passe du dashboard). L'envoi reste un copier-coller : LeBonCoin n'a pas d'API de messagerie et bannit les envois automatisés.
 
+## Réseau d'acheteurs (`/crm` → 👥 Acheteurs)
+
+Chaque personne qui te dit ce qu'elle cherche (modèles, budget max, année min, km max, carburant, boîte) est enregistrée (`crm/buyers/`, API `GET/POST /api/buyers`, `PATCH/DELETE /api/buyers/:id`). Le matching (`backend/utils/matching.js`) compare son budget au **prix de revente** (revente chez toi, sinon prix marché). Les correspondances apparaissent :
+- sur les cartes du radar (« 👥 N acheteurs ») ;
+- dans les alertes Telegram (« Acheteur(s) prêt(s) ») ;
+- dans l'onglet Acheteurs, sur les voitures du CRM, avec le message prêt et la création de la fiche acheteur en un clic.
+
 ## Apprentissage (`/crm` → 📈 Apprentissage)
 
 Chaque deal mené dans le CRM mesure la réalité, à comparer aux hypothèses du radar :
