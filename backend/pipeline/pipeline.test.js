@@ -321,3 +321,18 @@ describe('Comparables à la demande', () => {
     assert.deepEqual(ondemandCandidates(missing, { max: 2, skip }).map((s) => s.input.searchText), ['skoda fabia', 'seat ibiza']);
   });
 });
+
+describe('Modèles LeBonCoin', () => {
+  it('nettoie "model all", la marque répétée et "Autres"', async () => {
+    const { cleanModel } = await import('./normalize.js');
+    const { modelKey } = await import('./market.js');
+    const { ondemandSource } = await import('../config/sources.js');
+    assert.equal(cleanModel('Tiguan_model_all', 'Volkswagen'), 'Tiguan');
+    assert.equal(cleanModel('Tiguan model all', 'Volkswagen'), 'Tiguan');
+    assert.equal(cleanModel('Volkswagen Tiguan', 'Volkswagen'), 'Tiguan');
+    assert.equal(cleanModel('Autres', 'Opel'), null);
+    const a = { type: 'auto', brand: 'Volkswagen', model: 'Tiguan model all', title: 'Tiguan' };
+    assert.equal(modelKey(a), modelKey({ ...a, model: 'Tiguan' }), 'anciens stocks comparables');
+    assert.equal(ondemandSource(a).input.searchText, 'volkswagen tiguan');
+  });
+});

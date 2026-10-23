@@ -47,7 +47,8 @@ export function variantOf(listing) {
  * Le modèle est complété par le motif de cible reconnu dans le titre (ex. "mt10" ≠ "mt07").
  */
 export function modelKey(listing) {
-  const model = compact(listing.model);
+  // Annonces stockées avant le nettoyage des modèles : "tiguanmodelall" == "tiguan".
+  const model = compact(listing.model).replace(/modeles?all$|modelall$/, '');
   const titleModel = listing.type === 'moto' ? compact(listing.title ?? '').match(/mt\d{2}|z\d{3}|r1[02]\d0gs|cb\d{3}/)?.[0] : undefined;
   return `${listing.type}:${compact(listing.brand)}:${titleModel && !model.includes(titleModel) ? `${model}-${titleModel}` : model}:${variantOf(listing)}`;
 }
