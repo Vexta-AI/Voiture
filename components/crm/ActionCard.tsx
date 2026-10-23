@@ -78,10 +78,17 @@ export function ActionCard({ deal, action, heat, onAct, onOpen }: { deal: Deal; 
   return (
     <article className={cn('card flex min-w-0 flex-col gap-3 p-4', heat.level === 'chaud' && 'border-rose-300 dark:border-rose-500/40')}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        {deal.vehicle.photo && (
+          <a href={vehicleUrl ?? undefined} target="_blank" rel="noreferrer" className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-ink-100">
+            {/* eslint-disable-next-line @next/next/no-img-element -- photo LeBonCoin externe */}
+            <img src={deal.vehicle.photo} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+          </a>
+        )}
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <HeatBadge level={heat.level} score={heat.score} />
             <Chip tone={KIND_TONE[deal.kind]}>{KIND_LABEL[deal.kind]}</Chip>
+            {deal.vehicle.masterclass && <span className="rounded-md bg-violet-600 px-2 py-0.5 text-xs font-bold text-white">💎 MASTERCLASS</span>}
             {deal.vehicle.areaType === 'campagne' && <Chip tone="green">🌾 Campagne</Chip>}
             {deal.source === 'radar' && <Chip>Radar</Chip>}
           </div>
@@ -106,6 +113,15 @@ export function ActionCard({ deal, action, heat, onAct, onOpen }: { deal: Deal; 
       </div>
 
       <DealNumbers deal={deal} />
+
+      {deal.vehicle.reasons && deal.vehicle.reasons.length > 0 && (
+        <ul className="space-y-0.5 rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-600">
+          <li className="font-semibold text-ink-900">Pourquoi ce prix ?</li>
+          {deal.vehicle.reasons.slice(0, 3).map((r) => (
+            <li key={r}>• {r}</li>
+          ))}
+        </ul>
+      )}
 
       {heat.reasons.length > 0 && <p className="text-xs text-ink-600">{heat.reasons.join(' · ')}</p>}
 

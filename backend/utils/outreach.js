@@ -116,6 +116,8 @@ export function buildOutreachPayload(listing, analysis, options = {}) {
       grossMargin: analysis.finance.grossMargin,
       netMargin: analysis.finance.netMargin,
       realNetMargin: analysis.finance.realNetMargin,
+      masterclass: analysis.masterclass,
+      reasons: analysis.priceReasons.reasons,
       registrationCost: analysis.finance.registrationCost,
       transportCost: analysis.finance.transportCost,
       maxBuyPrice: analysis.finance.maxBuyPriceForPepite,

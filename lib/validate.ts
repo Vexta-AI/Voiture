@@ -56,6 +56,7 @@ export function validateListing(input: unknown): Result {
       options: Array.isArray(o.options) ? o.options.filter((x): x is string => typeof x === 'string') : undefined,
       doors: num(o.doors),
       fiscalHp: num(o.fiscalHp),
+      photos: Array.isArray(o.photos) ? o.photos.filter((x): x is string => typeof x === 'string' && /^https?:\/\//.test(x)).slice(0, 8) : undefined,
       vin: str(o.vin),
       licenseCategory: license === 'MTT1' || license === 'MTT2' ? license : undefined,
       beltMonthsAgo: num(o.beltMonthsAgo),

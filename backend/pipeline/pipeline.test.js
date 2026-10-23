@@ -351,3 +351,14 @@ describe('Lien de l’annonce', () => {
     assert.equal(adUrl({ id: 'a-001' }), null);
   });
 });
+
+describe('Photos', () => {
+  it('lit les photos quel que soit le format du scraper', async () => {
+    const { extractPhotos } = await import('./normalize.js');
+    assert.deepEqual(extractPhotos({ images: ['https://img/1.jpg', 'https://img/2.jpg'] }), ['https://img/1.jpg', 'https://img/2.jpg']);
+    assert.deepEqual(extractPhotos({ images: { urls_large: ['https://img/a.jpg'] } }), ['https://img/a.jpg']);
+    assert.deepEqual(extractPhotos({ images: [{ url: 'https://img/b.jpg' }] }), ['https://img/b.jpg']);
+    assert.deepEqual(extractPhotos({ thumbnail: 'https://img/t.jpg' }), ['https://img/t.jpg']);
+    assert.deepEqual(extractPhotos({}), []);
+  });
+});

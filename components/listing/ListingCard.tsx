@@ -35,6 +35,7 @@ export function ListingCard({
 }) {
   const { listing, analysis } = item;
   const [open, setOpen] = useState(false);
+  const [photo, setPhoto] = useState(0);
   const refused = analysis.blacklist.length > 0;
   const canOutreach = analysis.status.key === 'PEPITE' || (mode === 'mandate' && analysis.mandateEligible);
   const f = analysis.finance;
@@ -49,12 +50,27 @@ export function ListingCard({
   ].filter(Boolean);
 
   return (
-    <article className={cn('card flex flex-col overflow-hidden', refused && 'opacity-80')}>
+    <article className={cn('card flex flex-col overflow-hidden', refused && 'opacity-80', analysis.masterclass && 'ring-2 ring-violet-500')}>
+      {listing.photos && listing.photos.length > 0 && (
+        <a href={url ?? undefined} target="_blank" rel="noreferrer" className="relative block aspect-[16/9] bg-ink-100">
+          {/* eslint-disable-next-line @next/next/no-img-element -- photos LeBonCoin externes, pas d'optimisation Next */}
+          <img src={listing.photos[photo] ?? listing.photos[0]} alt={listing.title} loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+          {listing.photos.length > 1 && (
+            <span className="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white">📷 {listing.photos.length}</span>
+          )}
+        </a>
+      )}
       <div className="flex items-start gap-3 p-4 pb-3">
         <ScoreGauge score={analysis.score} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <StatusBadge status={analysis.status.key} label={analysis.status.label} />
+            {analysis.masterclass ? (
+              <span className="inline-flex items-center rounded-md bg-violet-600 px-2 py-0.5 text-xs font-bold text-white" title="Marge réelle ≥ 2 × le seuil pépite, aucun signal de risque">
+                💎 MASTERCLASS
+              </span>
+            ) : (
+              <StatusBadge status={analysis.status.key} label={analysis.status.label} />
+            )}
             <Chip>{analysis.segmentLabel}</Chip>
             <Chip tone={analysis.daysOnline >= 15 ? 'blue' : 'slate'} title="Jours en ligne">
               J+{analysis.daysOnline}
@@ -129,6 +145,27 @@ export function ListingCard({
           </div>
         ))}
 
+        {!refused && analysis.priceReasons.reasons.length > 0 && (
+          <div className={cn('rounded-lg px-3 py-2 text-xs', analysis.priceReasons.risks.length ? 'bg-amber-50 dark:bg-amber-500/10' : 'bg-ink-50')}>
+            <p className="mb-1 font-semibold text-ink-900">Pourquoi ce prix ?</p>
+            <ul className="space-y-0.5 text-ink-600">
+              {(open ? analysis.priceReasons.reasons : analysis.priceReasons.reasons.slice(0, 3)).map((r) => (
+                <li key={r}>• {r}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {listing.options && listing.options.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {listing.options.slice(0, open ? undefined : 8).map((o) => (
+              <span key={o} className="rounded bg-ink-100 px-1.5 py-0.5 text-[11px] text-ink-600">
+                {o}
+              </span>
+            ))}
+          </div>
+        )}
+
         {(analysis.triggers.length > 0 || analysis.levers.length > 0) && (
           <div className="flex flex-wrap gap-1.5">
             {analysis.triggers.map((t) => (
@@ -168,7 +205,17 @@ export function ListingCard({
                 ))}
               </ul>
             )}
-            {listing.description && <p className="rounded-lg bg-ink-50 p-3 text-xs leading-relaxed text-ink-600">{listing.description}</p>}
+            {listing.photos && listing.photos.length > 1 && (
+              <div className="flex gap-1.5 overflow-x-auto">
+                {listing.photos.map((p, i) => (
+                  <button key={p} type="button" onClick={() => setPhoto(i)} className={cn('h-14 w-20 shrink-0 overflow-hidden rounded-md border', i === photo ? 'border-ink-900' : 'border-ink-200')}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- photos LeBonCoin externes */}
+                    <img src={p} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+            {listing.description && <p className="whitespace-pre-line rounded-lg bg-ink-50 p-3 text-xs leading-relaxed text-ink-600">{listing.description}</p>}
           </div>
         )}
 
@@ -180,7 +227,7 @@ export function ListingCard({
           )}
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" className="btn-ghost px-2 text-xs" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-              {open ? 'Masquer le détail' : mode === 'mandate' ? 'Détail du mandat' : 'Détail du calcul'}
+              {open ? 'Masquer le détail' : mode === 'mandate' ? 'Détail du mandat' : 'Détail, photos & description'}
             </button>
             <div className="ml-auto flex flex-wrap justify-end gap-2">
               {url && (

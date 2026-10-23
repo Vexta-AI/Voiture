@@ -21,7 +21,7 @@ export function formatTelegramAlert(payload, context = {}) {
   const head =
     payload.strategy === 'mandate'
       ? `🤝 <b>MANDAT J+${listing.daysOnline}</b> · revenu ${eur(mandate?.totalRevenue ?? 0)} · 0 € de trésorerie`
-      : `🔥 <b>PÉPITE</b> · marge réelle ${eur(scoring.realNetMargin)} · score ${scoring.score}/100`;
+      : `${scoring.masterclass ? '💎 <b>MASTERCLASS</b>' : '🔥 <b>PÉPITE</b>'} · marge réelle ${eur(scoring.realNetMargin)} · score ${scoring.score}/100`;
 
   const lines = [
     head,
@@ -29,6 +29,7 @@ export function formatTelegramAlert(payload, context = {}) {
     `${listing.year} · ${listing.mileage.toLocaleString('fr-FR')} km · ${escape(listing.location ?? '')}`,
     `Prix ${eur(listing.price)} · cote ${eur(listing.marketPrice)}${context.comparables ? ` (${context.comparables} comparables)` : ''}`,
   ];
+  if (scoring.reasons?.length) lines.push(`<i>Pourquoi ce prix :</i> ${scoring.reasons.slice(0, 3).map(escape).join(' ')}`);
   if (payload.strategy === 'negotiation' && negotiation) {
     lines.push(`Offre : <b>${eur(negotiation.offerPrice)}</b> (−${eur(negotiation.discount)}) · marge négociée ${eur(scoring.negotiatedNetMargin)}`);
   }

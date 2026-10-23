@@ -281,6 +281,38 @@ export const BLACKLIST_KEYWORDS = [
   { id: 'contre-visite', label: 'Contre-visite', pattern: /contre[ -]?visite/ },
 ];
 
+/**
+ * POURQUOI CE PRIX ? Ce que dit l'annonce sur un prix sous la cote.
+ * motivated : vendeur pressé, la bonne affaire est réelle (et la négo facile).
+ * risks : le prix bas cache un problème -> jamais de MASTERCLASS, vérifier avant de bouger.
+ */
+export const PRICE_SIGNALS = {
+  motivated: [
+    { id: 'urgent', label: 'Vente urgente', pattern: /\burgent|\burgence|a vendre (vite|rapidement)|vente rapide/ },
+    { id: 'depart', label: 'Départ / déménagement', pattern: /demenag|depart (a|en|pour) l'?etranger|expatri|mutation|quitte (la france|la region)/ },
+    { id: 'besoin', label: "Besoin d'argent", pattern: /besoin d'?argent|raisons? financieres?|cause financiere/ },
+    { id: 'vie', label: 'Changement de vie', pattern: /naissance|bebe|agrandissement de la famille|succession|deces|heritage|cause (sante|retraite)|depart en retraite/ },
+    { id: 'double', label: 'Nouvelle voiture / doublon', pattern: /nouvelle voiture|achat d'?un(e)? autre|vehicule de fonction|double emploi|(2e|deuxieme|seconde) voiture|ne roule plus|ne sert plus/ },
+    { id: 'debattre', label: 'Prix à débattre', pattern: /a debattre|\bnegociable|faire offre|ouvert a la negociation/ },
+  ],
+  risks: [
+    { id: 'accident', label: 'Accident / VGE', pattern: /accidente|\baccident|\bchoc\b|sinistre|redresse|\bvge\b|\bvei\b|\bepave/ },
+    { id: 'moteur', label: 'Problème moteur', pattern: /(probleme|souci|bruit|claquement|fumee).{0,30}(moteur|turbo|distribution|injecteur)|joint de culasse|turbo (hs|mort|a changer)|consomme de l'?huile/ },
+    { id: 'boite', label: 'Problème boîte / embrayage', pattern: /(probleme|souci|bruit|patine).{0,30}(boite|embrayage)|embrayage (a changer|a faire|hs|qui patine)/ },
+    { id: 'panne', label: 'Non roulant / pour pièces', pattern: /non roulante?|pour pieces|pieces detachees|ne demarre (pas|plus)|en panne/ },
+    { id: 'papiers', label: 'Papiers pas en règle', pattern: /sans carte grise|sans papiers|carte grise (perdue|a refaire)|\bgagee?\b|pour l'?export|non homologue/ },
+    { id: 'ct', label: 'CT à faire / défaillances', pattern: /(ct|controle technique) (a faire|a passer|pas fait|non fait|expire)|defaillances? (majeures?|critiques?)/ },
+    { id: 'compteur', label: 'Kilométrage douteux', pattern: /compteur (change|remplace|non d'?origine)|kilometrage (non garanti|incertain|non certifie)/ },
+  ],
+  /** Kilométrage annuel au-delà duquel un prix bas s'explique (usure). */
+  highMileagePerYear: 25000,
+  /** Décote vs cote à partir de laquelle on parle d'une vraie affaire. */
+  bigGapRate: 0.15,
+};
+
+/** 💎 MASTERCLASS : pépite à marge réelle >= 2 x le seuil, sans aucun signal de risque, prix crédible (>= 60 % de la cote). */
+export const MASTERCLASS = { marginMultiplier: 2, minPriceRate: 0.6, scoreBonus: 10 };
+
 // ---------------------------------------------------------------------------
 // 5. Options "déclencheurs" — bonus +500 € à +1 000 € sur la valeur perçue
 // ---------------------------------------------------------------------------
