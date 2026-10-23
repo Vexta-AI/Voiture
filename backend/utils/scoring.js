@@ -62,6 +62,7 @@ import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplaceme
  * @property {string[]} [options]
  * @property {number} [doors]
  * @property {{ low: number, high: number, comparables: number, daysOnMarket: number|null }} [marketStats] marché actuel (comparables)
+ * @property {{ price: number, low: number, high: number, comparables: number, daysOnMarket: number|null, radiusKm: number }} [localMarket] revente chez toi
  * @property {number} [argusPrice]    cote Argus saisie à la main
  * @property {string[]} [photos]    photos de l'annonce
  * @property {number} [fiscalHp]       puissance fiscale (CV), base de la carte grise
@@ -557,6 +558,14 @@ export function scoreListing(listing, options = {}) {
         : `Marché actif : les annonces similaires sont en ligne depuis ${stats.daysOnMarket} jours (médiane).`,
     );
   }
+  // Revente chez toi : la marge réelle si tu revends au prix des annonces de ta zone.
+  const local = listing.localMarket ?? null;
+  const localMargin = local ? local.price - askingPrice - fixedCosts - purchaseCosts : null;
+  if (local && localMargin !== null) {
+    insights.push(
+      `Revente chez toi (${local.comparables} annonces à moins de ${local.radiusKm} km) : ${local.price.toLocaleString('fr-FR')} € → marge réelle ${localMargin >= 0 ? '+' : ''}${localMargin.toLocaleString('fr-FR')} €.`,
+    );
+  }
   if (listing.argusPrice) {
     const gap = Math.round(((listing.argusPrice - marketPrice) / listing.argusPrice) * 100);
     insights.push(`Cote Argus ${listing.argusPrice.toLocaleString('fr-FR')} € : le marché actuel est ${gap >= 0 ? `${gap} % en dessous` : `${-gap} % au-dessus`}.`);
@@ -566,7 +575,12 @@ export function scoreListing(listing, options = {}) {
     realNetMargin >= threshold * MASTERCLASS.marginMultiplier &&
     why.risks.length === 0 &&
     marketPrice > 0 &&
-    askingPrice >= marketPrice * MASTERCLASS.minPriceRate;
+    askingPrice >= marketPrice * MASTERCLASS.minPriceRate &&
+    // Le marché de ta zone doit confirmer : revendue chez toi, l'affaire reste au-dessus du seuil.
+    (localMargin === null || localMargin > threshold);
+  if (status.key === 'PEPITE' && localMargin !== null && localMargin <= threshold) {
+    warnings.push(`Chez toi, ça se revend moins cher (${local?.price.toLocaleString('fr-FR')} €) : marge locale ${localMargin.toLocaleString('fr-FR')} €, sous le seuil pépite.`);
+  }
   if (why.risks.length > 0 && status.key === 'PEPITE') warnings.push(`Prix bas possiblement justifié : ${why.risks.map((r) => r.label).join(', ')}.`);
 
   // --- Score 0-100 ---
@@ -597,6 +611,7 @@ export function scoreListing(listing, options = {}) {
     masterclass,
     priceReasons: why,
     quality,
+    local: local && localMargin !== null ? { ...local, margin: localMargin } : null,
     market: stats ? { ...stats, argus: listing.argusPrice ?? null } : listing.argusPrice ? { argus: listing.argusPrice } : null,
     score,
     segment,

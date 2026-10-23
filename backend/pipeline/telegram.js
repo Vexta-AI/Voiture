@@ -29,6 +29,9 @@ export function formatTelegramAlert(payload, context = {}) {
     `${listing.year} · ${listing.mileage.toLocaleString('fr-FR')} km · ${escape(listing.location ?? '')}`,
     `Prix ${eur(listing.price)} · cote ${eur(listing.marketPrice)}${context.comparables ? ` (${context.comparables} comparables)` : ''}`,
   ];
+  if (scoring.localResale) {
+    lines.push(`🏠 Revente chez toi : <b>${eur(scoring.localResale.price)}</b> (${scoring.localResale.comparables} annonces &lt; ${scoring.localResale.radiusKm} km) → marge <b>${eur(scoring.localResale.margin)}</b>`);
+  }
   if (scoring.reasons?.length) lines.push(`<i>Pourquoi ce prix :</i> ${scoring.reasons.slice(0, 3).map(escape).join(' ')}`);
   if (payload.strategy === 'negotiation' && negotiation) {
     lines.push(`Offre : <b>${eur(negotiation.offerPrice)}</b> (−${eur(negotiation.discount)}) · marge négociée ${eur(scoring.negotiatedNetMargin)}`);

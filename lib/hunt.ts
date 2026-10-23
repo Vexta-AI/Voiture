@@ -271,7 +271,7 @@ export async function ingestRun(runId: string, sourceKey: string) {
     const { runs, pool: stock } = await pool();
     const since = Date.now() - 3 * 86_400_000;
     const waiting = dedupeById(runs.filter((r) => r.kind === 'fresh' && new Date(r.fetchedAt).getTime() >= since).flatMap((r) => r.listings)).filter((l) => keys.has(modelKey(l)));
-    const { priced, unpriced } = priceListings(filterArea(waiting, area, { national: true }).kept, stock);
+    const { priced, unpriced } = priceListings(filterArea(waiting, area, { national: true }).kept, stock, { base: area });
     summary.priced = priced.length;
     summary.unpriced = unpriced;
     await alertOn(config, priced, summary);
@@ -284,7 +284,7 @@ export async function ingestRun(runId: string, sourceKey: string) {
   const { kept, stats } = filterArea(listings, area, { national: source.kind !== 'stale' });
   Object.assign(summary, { area: stats });
   const { pool: stock } = await pool();
-  const { priced, unpriced, missing } = priceListings(kept, stock);
+  const { priced, unpriced, missing } = priceListings(kept, stock, { base: area });
   summary.priced = priced.length;
   summary.unpriced = unpriced;
   await alertOn(config, priced, summary);
@@ -303,7 +303,7 @@ async function computeLive() {
   const recentSince = Date.now() - 3 * 86_400_000;
   const recentAll = dedupeById(runs.filter((r) => r.kind !== 'market' && new Date(r.fetchedAt).getTime() >= recentSince).flatMap((r) => r.listings));
   const recent = filterArea(recentAll, huntConfig().area ?? DEFAULT_AREA).kept;
-  const { priced, unpriced, missing } = priceListings(recent, pool);
+  const { priced, unpriced, missing } = priceListings(recent, pool, { base: huntConfig().area ?? DEFAULT_AREA });
   const lastRun = runs.filter((r) => r.kind !== 'market').at(-1)?.fetchedAt ?? null;
   // Annonces réelles encore sans cote : affichées à part (cote à saisir), zone prioritaire d'abord.
   const pending = (missing as Listing[])

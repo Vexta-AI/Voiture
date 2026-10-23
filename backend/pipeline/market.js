@@ -9,6 +9,7 @@
  */
 
 import { compact, normalize } from '../utils/text.js';
+import { distanceKm } from './geo.js';
 
 export const MARKET_RULES = {
   /** Comparables minimum pour publier une cote. */
@@ -24,6 +25,10 @@ export const MARKET_RULES = {
   step: 50,
   /** Prix < 50 % de la cote : annonce suspecte (épave, arnaque, erreur de cote) -> jamais d'alerte. */
   suspiciousRatio: 0.5,
+  /** Revente chez toi : comparables autour de la base, 100 km puis 200 km. */
+  localRadiiKm: [100, 200],
+  /** Comparables locaux minimum (marché local plus étroit). */
+  localMinComparables: 3,
 };
 
 /**
@@ -65,7 +70,7 @@ function quantile(sorted, q) {
  * @param {import('../utils/scoring.js').Listing[]} pool annonces collectées (toutes sources)
  * @returns {null | { price: number, comparables: number, window: string, low: number, high: number }}
  */
-export function estimateMarketPrice(listing, pool) {
+export function estimateMarketPrice(listing, pool, minComparables = MARKET_RULES.minComparables) {
   const key = modelKey(listing);
   const sameModel = pool.filter((p) => p.id !== listing.id && p.price > 0 && modelKey(p) === key);
 
@@ -74,7 +79,7 @@ export function estimateMarketPrice(listing, pool) {
     const comps = sameModel.filter(
       (p) => Math.abs(p.year - listing.year) <= w.years && (!listing.mileage || !p.mileage || Math.abs(p.mileage - listing.mileage) <= tolerance),
     );
-    if (comps.length < MARKET_RULES.minComparables) continue;
+    if (comps.length < minComparables) continue;
 
     let prices = comps.map((p) => p.price).sort((a, b) => a - b);
     if (prices.length >= MARKET_RULES.trimFrom) {
@@ -96,6 +101,24 @@ export function estimateMarketPrice(listing, pool) {
       low: round(quantile(prices, 0.25)),
       high: round(quantile(prices, 0.75)),
     };
+  }
+  return null;
+}
+
+/**
+ * Prix de revente CHEZ TOI : médiane des comparables à moins de 100 km de la base (200 km à défaut).
+ * C'est le prix réaliste auquel tu revends dans ta zone, celui qui fait (ou pas) l'affaire.
+ * @param {import('../utils/scoring.js').Listing} listing
+ * @param {import('../utils/scoring.js').Listing[]} pool
+ * @param {{ lat: number, lng: number }} base
+ * @returns {null | { price: number, low: number, high: number, comparables: number, daysOnMarket: number|null, radiusKm: number }}
+ */
+export function estimateLocalPrice(listing, pool, base) {
+  const located = pool.filter((p) => typeof p.lat === 'number' && typeof p.lng === 'number');
+  for (const radiusKm of MARKET_RULES.localRadiiKm) {
+    const near = located.filter((p) => distanceKm(base, { lat: p.lat, lng: p.lng }) <= radiusKm);
+    const market = estimateMarketPrice(listing, near, MARKET_RULES.localMinComparables);
+    if (market) return { ...market, radiusKm };
   }
   return null;
 }

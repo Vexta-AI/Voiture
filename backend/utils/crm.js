@@ -83,6 +83,8 @@ export function createDeal({ kind, listing, analysis, message = null, offerPrice
           marketHigh: listing.marketStats?.high ?? null,
           daysOnMarket: listing.marketStats?.daysOnMarket ?? null,
           argusPrice: listing.argusPrice ?? null,
+          localPrice: analysis.local?.price ?? null,
+          localMargin: analysis.local?.margin ?? null,
           registrationCost: f.registrationCost,
           transportCost: f.transportCost,
           reconditioning: COSTS.RECONDITIONING_BASE,
@@ -294,7 +296,8 @@ export function leadHeat(deal, now = new Date()) {
 export function listedPriceOf(deal) {
   const n = deal.numbers;
   if (n.listedPrice) return n.listedPrice;
-  const base = deal.kind === 'mandat' ? n.salePrice : n.marketPrice;
+  // Revente : prix des annonces de ta zone s'il est connu, sinon la cote nationale.
+  const base = deal.kind === 'mandat' ? n.salePrice : n.localPrice ?? n.marketPrice;
   return base ? Math.max(0, Math.floor(base / 100) * 100 - 10) : 0;
 }
 

@@ -22,6 +22,8 @@ export interface Listing {
   doors?: number;
   /** Marché actuel : fourchette des comparables (25-75 %), nombre, jours en ligne médians */
   marketStats?: { low: number; high: number; comparables: number; daysOnMarket: number | null };
+  /** Revente chez toi : comparables à moins de 100 km (200 km à défaut) de la base */
+  localMarket?: { price: number; low: number; high: number; comparables: number; daysOnMarket: number | null; radiusKm: number };
   /** Cote Argus saisie à la main (pas d'accès gratuit à l'Argus officiel) */
   argusPrice?: number;
   /** Photos de l'annonce (URL) */

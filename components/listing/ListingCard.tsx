@@ -136,6 +136,18 @@ export function ListingCard({
         </div>
       </dl>
 
+      {analysis.local && (
+        <div className={cn('flex flex-wrap items-baseline justify-between gap-2 border-b border-ink-100 px-4 py-2 text-xs', analysis.masterclass ? 'bg-violet-50 dark:bg-violet-500/10' : 'bg-ink-50/60')}>
+          <span className="text-ink-600" title={`Médiane de ${analysis.local.comparables} annonces similaires à moins de ${analysis.local.radiusKm} km de ta base`}>
+            🏠 Revente chez toi <strong className="tabular text-ink-900">{eur(analysis.local.price)}</strong> ({analysis.local.comparables} annonces &lt; {analysis.local.radiusKm} km
+            {analysis.local.daysOnMarket !== null ? `, vente ≈ ${analysis.local.daysOnMarket} j` : ''})
+          </span>
+          <strong className={cn('tabular', analysis.local.margin > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')}>
+            marge {signedEur(analysis.local.margin)}
+          </strong>
+        </div>
+      )}
+
       {(analysis.market || analysis.quality.owners !== null) && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-ink-100 px-4 py-2 text-xs text-ink-600">
           {analysis.market && 'low' in analysis.market && (
