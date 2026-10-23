@@ -8,7 +8,7 @@ import { ondemandSource } from '../config/sources.js';
 import { cleanModel } from './normalize.js';
 import { buildOutreachPayload } from '../utils/outreach.js';
 import { scoreListing } from '../utils/scoring.js';
-import { MARKET_RULES, estimateMarketPrice } from './market.js';
+import { MARKET_RULES, estimateLocalPrice, estimateMarketPrice } from './market.js';
 
 /** Alertes max par run : au-delà, c'est que la cote est faussée, pas que le marché déborde de pépites. */
 export const MAX_ALERTS_PER_RUN = 10;
@@ -18,7 +18,7 @@ export const MAX_ALERTS_PER_RUN = 10;
  * @param {import('../utils/scoring.js').Listing[]} listings
  * @param {import('../utils/scoring.js').Listing[]} pool
  */
-export function priceListings(listings, pool) {
+export function priceListings(listings, pool, options = {}) {
   const priced = [];
   const missing = [];
   for (const listing of listings) {
@@ -27,8 +27,14 @@ export function priceListings(listings, pool) {
       missing.push(listing);
       continue;
     }
+    const local = options.base ? estimateLocalPrice(listing, pool, options.base) : null;
     priced.push({
-      listing: { ...listing, marketPrice: market.price, marketStats: { low: market.low, high: market.high, comparables: market.comparables, daysOnMarket: market.daysOnMarket } },
+      listing: {
+        ...listing,
+        marketPrice: market.price,
+        marketStats: { low: market.low, high: market.high, comparables: market.comparables, daysOnMarket: market.daysOnMarket },
+        ...(local ? { localMarket: { price: local.price, low: local.low, high: local.high, comparables: local.comparables, daysOnMarket: local.daysOnMarket, radiusKm: local.radiusKm } } : {}),
+      },
       market,
     });
   }

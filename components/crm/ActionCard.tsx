@@ -31,6 +31,7 @@ export function DealNumbers({ deal }: { deal: Deal }) {
             ['Ton offre', n.offerPrice],
             ['Max pépite', n.maxBuyPrice, 'Au-dessus, la marge passe sous le seuil PÉPITE'],
             ['Plafond', n.walkAwayPrice, 'Ne jamais dépasser : marge réelle à 0'],
+            ['Revente chez toi', n.localPrice, 'Médiane des annonces similaires autour de ta base'],
             ['Argus', n.argusPrice],
           ]
       : deal.kind === 'mandat'

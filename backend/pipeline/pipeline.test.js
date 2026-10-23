@@ -362,3 +362,27 @@ describe('Photos', () => {
     assert.deepEqual(extractPhotos({}), []);
   });
 });
+
+describe('Revente chez toi', () => {
+  it('cote locale à moins de 100 km, puis 200 km', async () => {
+    const { estimateLocalPrice } = await import('./market.js');
+    const base = { lat: 44.9, lng: -0.74 };
+    const near = (id, price, lat = 44.85, lng = -0.58) => ({ ...listing({ ad_id: id, price }), lat, lng });
+    const target = listing({ ad_id: 500, price: 6000 });
+    const pool = [near(501, 9500), near(502, 9600), near(503, 9700), { ...near(504, 7000), lat: 48.85, lng: 2.35 }, { ...near(505, 7100), lat: 48.85, lng: 2.35 }];
+    const local = estimateLocalPrice(target, pool, base);
+    assert.equal(local?.radiusKm, 100);
+    assert.equal(local?.price, 9600);
+    assert.equal(estimateLocalPrice(target, pool.slice(3), base), null, 'Paris hors zone');
+  });
+
+  it('MASTERCLASS seulement si ta zone confirme', () => {
+    const base = { ...listing({ ad_id: 600, price: 5000 }), marketPrice: 8000, description: 'Vente urgente.' };
+    const ok = scoreListing({ ...base, localMarket: { price: 8200, low: 7900, high: 8500, comparables: 5, daysOnMarket: 20, radiusKm: 100 } }, { now: NOW });
+    assert.equal(ok.masterclass, true);
+    assert.equal(ok.local?.margin, 8200 - 5000 - 550 - 304);
+    const low = scoreListing({ ...base, localMarket: { price: 6200, low: 6000, high: 6400, comparables: 4, daysOnMarket: 40, radiusKm: 100 } }, { now: NOW });
+    assert.equal(low.masterclass, false);
+    assert.ok(low.warnings.some((w) => w.includes('Chez toi')));
+  });
+});
