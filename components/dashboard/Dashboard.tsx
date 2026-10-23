@@ -7,6 +7,7 @@ import { AUTO_TARGETS, BUDGETS, MANDATE, MOTO_TARGETS, PRICE_BANDS, SEGMENTS } f
 import { scoreListings } from '@/backend/utils/scoring.js';
 import { AnalyzerDrawer } from '@/components/analyzer/AnalyzerDrawer';
 import { ListingCard, type MessageKind } from '@/components/listing/ListingCard';
+import { PendingCard } from '@/components/listing/PendingCard';
 import { MessageModal } from '@/components/messages/MessageModal';
 import { OutreachModal } from '@/components/messages/OutreachModal';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -38,7 +39,7 @@ const SORTERS: Record<SortKey, (a: ScoredListing, b: ScoredListing) => number> =
   mandate: (a, b) => (b.analysis.mandate?.totalRevenue ?? 0) - (a.analysis.mandate?.totalRevenue ?? 0),
 };
 
-export function Dashboard({ initialListings, radar }: { initialListings: Listing[]; radar: RadarInfo }) {
+export function Dashboard({ initialListings, pending = [], radar }: { initialListings: Listing[]; pending?: Listing[]; radar: RadarInfo }) {
   const [tab, setTab] = useState<TabKey>('auto');
   const [userListings, setUserListings] = useState<Listing[]>([]);
   // Aucun modèle sélectionné = tous les modèles.
@@ -175,6 +176,18 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
   }, [filtered]);
 
   const activeTab = TABS.find((t) => t.key === tab)!;
+  /** Annonces réelles sans cote de l'onglet (hors celles déjà cotées à la main). */
+  const pendingVisible = useMemo(() => {
+    if (tab === 'mandat') return [];
+    const q = query.trim().toLowerCase();
+    return pending.filter(
+      (l) =>
+        l.type === tab &&
+        !userIds.has(l.id) &&
+        (zone === 'all' || (l.zone ?? 'prioritaire') === zone) &&
+        (!q || `${l.title} ${l.location ?? ''}`.toLowerCase().includes(q)),
+    );
+  }, [pending, tab, userIds, zone, query]);
 
   return (
     <div className="min-h-screen">
@@ -254,9 +267,11 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
 
         {visible.length === 0 ? (
           <div className="card px-6 py-16 text-center">
-            <p className="text-sm font-medium text-ink-700">Aucune annonce ne correspond aux filtres.</p>
+            <p className="text-sm font-medium text-ink-700">{pendingVisible.length > 0 ? 'Aucune annonce cotée ici pour l’instant.' : 'Aucune annonce ne correspond aux filtres.'}</p>
             <p className="mt-1 text-sm text-ink-500">
-              {tab === 'mandat'
+              {pendingVisible.length > 0
+                ? `${pendingVisible.length} annonces réelles attendent leurs comparables, juste en dessous.`
+                : tab === 'mandat'
                 ? `Les annonces apparaissent ici après ${MANDATE.minDaysOnline - 1} jours en ligne.`
                 : 'Élargissez les cibles ou ajoutez une annonce à analyser.'}
             </p>
@@ -275,6 +290,22 @@ export function Dashboard({ initialListings, radar }: { initialListings: Listing
               />
             ))}
           </div>
+        )}
+
+        {pendingVisible.length > 0 && (
+          <section className="space-y-3 pt-2">
+            <div>
+              <h2 className="text-sm font-semibold text-ink-900">Annonces réelles sans cote ({pendingVisible.length})</h2>
+              <p className="text-xs text-ink-500">
+                Pas encore assez de comparables pour calculer la cote : le radar va les chercher automatiquement. Tu peux aussi saisir ta cote pour scorer une annonce tout de suite.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {pendingVisible.map((l) => (
+                <PendingCard key={l.id} listing={l} onPrice={(listing, marketPrice) => persist([{ ...listing, marketPrice }, ...userListings])} />
+              ))}
+            </div>
+          </section>
         )}
 
         <footer className="pt-4 text-center text-xs text-ink-400">

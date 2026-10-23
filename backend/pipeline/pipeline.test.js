@@ -300,3 +300,24 @@ describe('Apify & sources', () => {
     assert.equal(parseArea(undefined), null);
   });
 });
+
+describe('Comparables à la demande', () => {
+  it('une recherche par modèle sans cote, zone prioritaire d’abord, modèles récents exclus', async () => {
+    const { ondemandCandidates } = await import('./hunt.js');
+    const { ondemandSource } = await import('../config/sources.js');
+    const mk = (id, brand, model, extra = {}) => ({ id, type: 'auto', brand, model, title: `${brand} ${model}`, year: 2018, mileage: 80000, price: 9000, marketPrice: 0, publishedAt: NOW.toISOString(), ...extra });
+    const missing = [
+      mk('1', 'Seat', 'Ibiza', { zone: 'france', distanceKm: 600 }),
+      mk('2', 'Kia', 'Ceed', { zone: 'prioritaire', distanceKm: 50 }),
+      mk('3', 'Kia', 'Ceed', { zone: 'prioritaire', distanceKm: 20 }),
+      mk('4', 'Fiat', '500', { zone: 'prioritaire', distanceKm: 10, price: 1500 }), // hors budget
+      mk('5', 'Skoda', 'Fabia', { zone: 'prioritaire', distanceKm: 90 }),
+    ];
+    const picked = ondemandCandidates(missing, { max: 2 });
+    assert.deepEqual(picked.map((s) => s.input.searchText), ['kia ceed', 'skoda fabia']);
+    assert.equal(picked[0].kind, 'market');
+    assert.ok(picked[0].key.startsWith('ondemand-auto-'));
+    const skip = new Set([ondemandSource(missing[1]).key]);
+    assert.deepEqual(ondemandCandidates(missing, { max: 2, skip }).map((s) => s.input.searchText), ['skoda fabia', 'seat ibiza']);
+  });
+});

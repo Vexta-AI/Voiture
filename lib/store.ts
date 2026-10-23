@@ -25,6 +25,7 @@ const ALERTS_PREFIX = 'radar/alerts/';
 const BATCHES_PREFIX = 'radar/batches/';
 const CLAIMS_PREFIX = 'radar/claims/';
 const LOG_PREFIX = 'radar/log/';
+const ONDEMAND_PREFIX = 'radar/ondemand/';
 
 export const storeEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 
@@ -160,4 +161,21 @@ export async function runsSummary(days: number) {
     if (r.fetchedAt > s.last) s.last = r.fetchedAt;
   }
   return bySource;
+}
+
+/** Recherche de comparables lancée à la demande : gardée pour l'ingestion et le délai de relance. */
+export async function markOndemand(source: { key: string }) {
+  await writeJson(`${ONDEMAND_PREFIX}${source.key}.json`, { launchedAt: new Date().toISOString(), source }, true);
+}
+
+export async function loadOndemand<T>(key: string) {
+  return (await readJson<{ source: T }>(`${ONDEMAND_PREFIX}${key}.json`))?.source ?? null;
+}
+
+/** Clés des recherches à la demande lancées depuis moins de `days` jours. */
+export async function recentOndemandKeys(days: number) {
+  const since = Date.now() - days * 86_400_000;
+  return new Set(
+    (await listAll(ONDEMAND_PREFIX)).filter((b) => b.uploadedAt.getTime() >= since).map((b) => b.pathname.slice(ONDEMAND_PREFIX.length).replace(/\.json$/, '')),
+  );
 }

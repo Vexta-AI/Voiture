@@ -150,6 +150,8 @@ Apify (fin de run) → /api/hunt/ingest → relit le run chez Apify → normalis
 ]
 ```
 
+**Comparables à la demande** : une annonce fraîche sans assez de comparables déclenche une recherche de son modèle sur toute la France (2 par run, `HUNT_ONDEMAND_PER_RUN`, chaque modèle au plus tous les 14 jours). À l'arrivée des comparables, les annonces de ce modèle sont recotées et alertées. En attendant, le dashboard les affiche dans « Annonces réelles sans cote », avec un champ pour saisir ta cote et scorer tout de suite.
+
 **Lancement manuel** (ex. pour tester) : `curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/hunt/start` (ajoute `?weekly=1` pour lancer aussi annonces anciennes + comparables, indispensable au tout premier lancement).
 
 ## CRM (`/crm`)
