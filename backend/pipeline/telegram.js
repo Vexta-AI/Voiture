@@ -14,7 +14,7 @@ const MAX_LENGTH = 4096;
 
 /**
  * @param {Extract<ReturnType<import('../utils/outreach.js').buildOutreachPayload>, { ok: true }>} payload
- * @param {{ comparables?: number }} [context]
+ * @param {{ comparables?: number, buyers?: { name: string, budgetMax: number }[] }} [context]
  */
 export function formatTelegramAlert(payload, context = {}) {
   const { listing, scoring, negotiation, mandate, message } = payload;
@@ -40,6 +40,9 @@ export function formatTelegramAlert(payload, context = {}) {
   }
   if (payload.strategy === 'mandate' && mandate) {
     lines.push(`Prix net vendeur ${eur(mandate.ownerNet)} · plus-value ${eur(mandate.commission)}`);
+  }
+  if (context.buyers?.length) {
+    lines.push(`👥 <b>Acheteur(s) prêt(s)</b> : ${context.buyers.map((b) => `${escape(b.name)} (budget ${eur(b.budgetMax)})`).join(', ')}`);
   }
   const url = adUrl(listing);
   if (url) lines.push(`<a href="${escape(url)}">👉 Ouvrir l'annonce</a>`);

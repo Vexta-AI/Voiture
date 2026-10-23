@@ -10,9 +10,11 @@ import { dedupeById } from '@/backend/pipeline/market.js';
 import { normalizeApifyItem } from '@/backend/pipeline/normalize.js';
 import { formatTelegramAlert, sendTelegram } from '@/backend/pipeline/telegram.js';
 import { dailyDigest } from '@/backend/utils/crm.js';
+import { matchBuyers } from '@/backend/utils/matching.js';
 import { DEFAULT_AREA, HUNT_LIMITS, ONDEMAND_PREFIX, defaultSources, parseArea, parseTypes, type HuntSource } from '@/backend/config/sources.js';
 import { modelKey } from '@/backend/pipeline/market.js';
 
+import { loadBuyers } from './buyers-store';
 import { dealFromListing } from './crm-deals';
 import { createDealOnce, loadDeals } from './crm-store';
 import {
@@ -161,6 +163,8 @@ export async function continueBatch(batchId: string) {
 
 /** Envoie les alertes (Telegram) et crée les deals CRM d'annonces cotées. */
 async function alertOn(config: Config, priced: ReturnType<typeof priceListings>['priced'], summary: { alerts: number; skippedDuplicates: number; alertErrors: number; crmCreated: number }) {
+  // Réseau d'acheteurs : chaque alerte dit qui attend déjà cette voiture.
+  const buyers = await loadBuyers().catch(() => []);
   for (const alert of selectAlerts(priced)) {
     if (!alert.payload.ok) continue;
     // CRM : chaque pépite / cible mandat entre dans le pipeline avec son premier message prêt.
@@ -179,7 +183,10 @@ async function alertOn(config: Config, priced: ReturnType<typeof priceListings>[
       await sendTelegram({
         token: config.telegramToken,
         chatId: config.telegramChatId,
-        text: formatTelegramAlert(alert.payload, { comparables: alert.market.comparables }),
+        text: formatTelegramAlert(alert.payload, {
+          comparables: alert.market.comparables,
+          buyers: matchBuyers(alert.listing, buyers).map((m) => ({ name: m.buyer.name, budgetMax: m.buyer.criteria.budgetMax })),
+        }),
       });
       await markAlertSent(alert.key, { listingId: alert.listing.id, strategy: alert.payload.strategy, score: alert.analysis.score });
       summary.alerts += 1;

@@ -11,10 +11,11 @@ import { cn, eur } from '@/lib/format';
 
 import { ActionCard } from './ActionCard';
 import { DealDrawer } from './DealDrawer';
+import { BuyersView } from './BuyersView';
 import { LearningView } from './LearningView';
 import { HeatBadge, KIND_LABEL } from './shared';
 
-type View = 'todo' | 'pipeline' | 'learn';
+type View = 'todo' | 'pipeline' | 'buyers' | 'learn';
 type KindFilter = 'all' | DealKind;
 export type DealActionBody = Record<string, unknown> & { type: string };
 
@@ -139,6 +140,7 @@ export function CrmBoard({ initialDeals, enabled }: { initialDeals: Deal[]; enab
             [
               ['todo', `À traiter (${queue.length})`],
               ['pipeline', 'Pipeline'],
+              ['buyers', '👥 Acheteurs'],
               ['learn', '📈 Apprentissage'],
             ] as const
           ).map(([key, label]) => (
@@ -216,6 +218,8 @@ export function CrmBoard({ initialDeals, enabled }: { initialDeals: Deal[]; enab
           </>
         ) : view === 'pipeline' ? (
           <PipelineView deals={deals} kind={pipelineKind} onKind={setPipelineKind} now={now} onOpen={setSelected} />
+        ) : view === 'buyers' ? (
+          <BuyersView deals={deals} onAddBuyerDeal={addBuyer} />
         ) : (
           <LearningView deals={deals} />
         )}

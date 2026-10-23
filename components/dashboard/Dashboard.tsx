@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { AUTO_TARGETS, BUDGETS, MANDATE, MOTO_TARGETS, PRICE_BANDS, SEGMENTS } from '@/backend/config/rules.js';
+import { matchBuyers } from '@/backend/utils/matching.js';
 import { scoreListings } from '@/backend/utils/scoring.js';
 import { AnalyzerDrawer } from '@/components/analyzer/AnalyzerDrawer';
 import { ListingCard, type MessageKind } from '@/components/listing/ListingCard';
@@ -11,6 +12,7 @@ import { PendingCard } from '@/components/listing/PendingCard';
 import { MessageModal } from '@/components/messages/MessageModal';
 import { OutreachModal } from '@/components/messages/OutreachModal';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import type { WaitingBuyer } from '@/lib/crm';
 import type { Listing, ScoredListing, StatusKey, TabKey } from '@/lib/types';
 
 import { FilterBar, type Option, type SortKey, type StatusFilter, type ZoneFilter } from './FilterBar';
@@ -56,6 +58,8 @@ export function Dashboard({ initialListings, pending = [], radar }: { initialLis
   const [aiEnabled, setAiEnabled] = useState(false);
   /** Annonces déjà suivies dans le CRM (null = CRM non branché). */
   const [crmIds, setCrmIds] = useState<Set<string> | null>(null);
+  /** Réseau d'acheteurs en attente (vide si le CRM n'est pas branché). */
+  const [buyers, setBuyers] = useState<WaitingBuyer[]>([]);
 
   // Annonces saisies manuellement : simple confort local, le moteur reste la source de vérité.
   useEffect(() => {
@@ -69,6 +73,10 @@ export function Dashboard({ initialListings, pending = [], radar }: { initialLis
       .then((r) => r.json())
       .then((d) => setCrmIds(d.ok ? new Set((d.deals as { kind: string; vehicle: { listingId: string } }[]).map((x) => `${x.kind}:${x.vehicle.listingId}`)) : null))
       .catch(() => setCrmIds(null));
+    fetch('/api/buyers')
+      .then((r) => r.json())
+      .then((d) => d.ok && setBuyers(d.buyers))
+      .catch(() => undefined);
     fetch('/api/messages')
       .then((r) => r.json())
       .then((d) => setAiEnabled(Boolean(d.aiEnabled)))
@@ -286,6 +294,7 @@ export function Dashboard({ initialListings, pending = [], radar }: { initialLis
                 onMessage={(it, kind) => setMessage({ item: it, kind })}
                 onOutreach={setOutreach}
                 onRemove={userIds.has(item.listing.id) ? (id) => persist(userListings.filter((l) => l.id !== id)) : undefined}
+                buyers={matchBuyers(item.listing, buyers).map((m) => m.buyer.name)}
                 crm={crmIds ? { inCrm: crmIds.has(`${tab === 'mandat' ? 'mandat' : 'achat'}:${item.listing.id}`), onAdd: addToCrm } : undefined}
               />
             ))}

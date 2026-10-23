@@ -23,6 +23,7 @@ export function ListingCard({
   onOutreach,
   onRemove,
   crm,
+  buyers = [],
 }: {
   item: ScoredListing;
   mode?: 'hunt' | 'mandate';
@@ -32,6 +33,8 @@ export function ListingCard({
   onRemove?: (id: string) => void;
   /** Ajout au CRM (absent si le CRM n'est pas branché). */
   crm?: { inCrm: boolean; onAdd: (item: ScoredListing, kind: 'achat' | 'mandat') => void };
+  /** Acheteurs du réseau qui cherchent cette voiture. */
+  buyers?: string[];
 }) {
   const { listing, analysis } = item;
   const [open, setOpen] = useState(false);
@@ -79,6 +82,11 @@ export function ListingCard({
               <Chip tone={analysis.zone === 'france' ? 'amber' : 'green'} title={analysis.zone === 'france' ? 'Hors zone prioritaire : rapatriement déduit' : 'Zone prioritaire'}>
                 {analysis.zone === 'france' ? '🚚 ' : '📍 '}
                 {analysis.distanceKm} km
+              </Chip>
+            )}
+            {buyers.length > 0 && (
+              <Chip tone="blue" title={`Acheteurs en attente : ${buyers.join(', ')}`}>
+                👥 {buyers.length} acheteur{buyers.length > 1 ? 's' : ''}
               </Chip>
             )}
             {listing.priceDrop && (
