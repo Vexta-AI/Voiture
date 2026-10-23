@@ -172,6 +172,20 @@ Le radar remplit le CRM tout seul : chaque PÉPITE ou cible mandat alertée devi
 
 Stockage : Vercel Blob (`crm/deals/<id>.json`). API : `GET/POST /api/crm`, `PATCH/DELETE /api/crm/:id` (protégées par le mot de passe du dashboard). L'envoi reste un copier-coller : LeBonCoin n'a pas d'API de messagerie et bannit les envois automatisés.
 
+## Apprentissage (`/crm` → 📈 Apprentissage)
+
+Chaque deal mené dans le CRM mesure la réalité, à comparer aux hypothèses du radar :
+- négo de tes acheteurs (prix affiché → encaissé) ;
+- remise obtenue des vendeurs (affiché → acheté) ;
+- revente réelle vs prix marché du radar ;
+- remise en état réelle ;
+- délai de vente réel ;
+- taux de réponse des vendeurs ;
+- écart marge encaissée / marge prévue ;
+- réussite par niveau d'offre (moins de 8 %, 8-12 %, 12 % et plus).
+
+À partir de 3 deals, une mesure devient une **proposition de réglage**, jamais appliquée sans ton accord (`backend/utils/learning.js`). Ces chiffres n'existent que dans ton CRM : c'est l'avantage que personne ne peut copier.
+
 ## Sources & hypothèses (rien d'inventé)
 
 Chaque chiffre du radar est soit **sourcé**, soit **un choix métier signalé comme tel**. Aucune base de données publique ne donne de cote pro gratuite : le « prix marché » du radar est la **médiane des prix affichés** d'annonces comparables collectées, pas l'Argus ni un prix de vente réel.
