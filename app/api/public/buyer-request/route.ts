@@ -2,13 +2,16 @@ import { NextResponse } from 'next/server';
 
 import { sendTelegram } from '@/backend/pipeline/telegram.js';
 import { parseBuyerInput } from '@/backend/utils/matching.js';
-import { saveBuyer } from '@/lib/buyers-store';
+import { loadBuyers, saveBuyer } from '@/lib/buyers-store';
 import type { WaitingBuyer } from '@/lib/crm';
 import { crmEnabled } from '@/lib/crm-store';
 import { huntConfig } from '@/lib/hunt';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+/** Choix métier : plafond d'inscriptions publiques par heure. */
+const PUBLIC_LIMITS = { perHour: 20 };
 
 /**
  * POST /api/public/buyer-request — formulaire public « Je cherche une voiture ».
@@ -33,6 +36,11 @@ export async function POST(request: Request) {
   if (!parsed.phone && !parsed.email) return NextResponse.json({ ok: false, error: 'Indiquez un téléphone ou un e-mail pour être recontacté.' }, { status: 422 });
 
   const now = new Date();
+  // Anti-abus : au plus 20 inscriptions par heure via le formulaire (au-delà, c'est un robot ou un spam).
+  const existing = await loadBuyers().catch(() => []);
+  const lastHour = existing.filter((b) => b.source === 'formulaire' && now.getTime() - new Date(b.createdAt).getTime() < 3_600_000).length;
+  if (lastHour >= PUBLIC_LIMITS.perHour) return NextResponse.json({ ok: false, error: 'Trop de demandes, réessayez plus tard.' }, { status: 429 });
+
   const buyer: WaitingBuyer = {
     id: `b-${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     name: parsed.name,
@@ -41,7 +49,8 @@ export async function POST(request: Request) {
     notes: parsed.notes,
     source: 'formulaire',
     consentAt: now.toISOString(),
-    active: true,
+    // À valider dans le CRM avant d'entrer dans le matching : un faux inscrit ne pollue jamais les alertes.
+    active: false,
     createdAt: now.toISOString(),
     criteria: parsed.criteria,
   };
@@ -54,7 +63,7 @@ export async function POST(request: Request) {
     await sendTelegram({
       token: config.telegramToken,
       chatId: config.telegramChatId,
-      text: `👥 <b>Nouvel acheteur (formulaire)</b>\n${esc(buyer.name)} · ${esc(c.models?.join(', ') || 'tout modèle')} · budget ${c.budgetMax.toLocaleString('fr-FR')} €`,
+      text: `👥 <b>Nouvel acheteur (formulaire)</b> · à valider dans le CRM\n${esc(buyer.name)} · ${esc(c.models?.join(', ') || 'tout modèle')} · budget ${c.budgetMax.toLocaleString('fr-FR')} €`,
     }).catch((error: unknown) => console.error('[buyer-request] telegram', error));
   }
   return NextResponse.json({ ok: true }, { status: 201 });

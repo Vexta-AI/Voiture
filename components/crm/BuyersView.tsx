@@ -87,7 +87,7 @@ export function BuyersView({ deals, onAddBuyerDeal }: { deals: Deal[]; onAddBuye
         </p>
         <p className="mt-2">
           Ton formulaire public à partager (groupes Facebook, annonces, Instagram) : <a className="font-medium text-sky-700 underline dark:text-sky-400" href="/cherche" target="_blank" rel="noreferrer">/cherche</a>. Les
-          personnes s&apos;inscrivent elles-mêmes, avec leur consentement.
+          personnes s&apos;inscrivent elles-mêmes, avec leur consentement. Chaque inscription arrive en pause : valide-la (✓ Valider) pour qu&apos;elle entre dans les alertes.
         </p>
       </div>
 
@@ -151,7 +151,7 @@ export function BuyersView({ deals, onAddBuyerDeal }: { deals: Deal[]; onAddBuye
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <button type="button" className="btn-ghost px-2 text-xs" onClick={() => patch(b.id, { active: !b.active })}>
-                      {b.active ? 'Pause' : 'Réactiver'}
+                      {b.active ? 'Pause' : b.source === 'formulaire' ? '✓ Valider' : 'Réactiver'}
                     </button>
                     <button type="button" className="btn-ghost px-2 text-xs text-rose-600" onClick={() => remove(b.id)}>
                       ✕

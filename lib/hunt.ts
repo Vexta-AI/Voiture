@@ -9,18 +9,21 @@ import { filterArea } from '@/backend/pipeline/geo.js';
 import { dedupeById } from '@/backend/pipeline/market.js';
 import { normalizeApifyItem } from '@/backend/pipeline/normalize.js';
 import { formatTelegramAlert, sendTelegram } from '@/backend/pipeline/telegram.js';
+import { INSPECTION } from '@/backend/utils/inspection.js';
 import { dailyDigest } from '@/backend/utils/crm.js';
 import { matchBuyers } from '@/backend/utils/matching.js';
 import { DEFAULT_AREA, HUNT_LIMITS, ONDEMAND_PREFIX, defaultSources, parseArea, parseTypes, type HuntSource } from '@/backend/config/sources.js';
 import { modelKey } from '@/backend/pipeline/market.js';
 
 import { loadBuyers } from './buyers-store';
+import { inspectListing, inspectionEnabled } from './inspect';
 import { dealFromListing } from './crm-deals';
 import { createDealOnce, loadDeals } from './crm-store';
 import {
   alertAlreadySent,
   claimSource,
   loadBatch,
+  loadInspections,
   loadOndemand,
   loadRuns,
   markAlertSent,
@@ -32,7 +35,7 @@ import {
   saveRun,
   storeEnabled,
 } from './store';
-import type { Listing } from './types';
+import type { Inspection, Listing } from './types';
 
 /** Configuration lue dans les variables d'environnement Vercel. */
 export function huntConfig() {
@@ -162,11 +165,26 @@ export async function continueBatch(batchId: string) {
 }
 
 /** Envoie les alertes (Telegram) et crée les deals CRM d'annonces cotées. */
-async function alertOn(config: Config, priced: ReturnType<typeof priceListings>['priced'], summary: { alerts: number; skippedDuplicates: number; alertErrors: number; crmCreated: number }) {
+async function alertOn(config: Config, priced: ReturnType<typeof priceListings>['priced'], summary: { alerts: number; skippedDuplicates: number; alertErrors: number; crmCreated: number; inspected?: number }) {
   // Réseau d'acheteurs : chaque alerte dit qui attend déjà cette voiture.
   const buyers = await loadBuyers().catch(() => []);
-  for (const alert of selectAlerts(priced)) {
+  const alerts = selectAlerts(priced);
+  // Inspection IA des photos : pépites achat-revente seulement, quelques-unes par run, en parallèle.
+  const inspections = new Map<string, Inspection>();
+  if (inspectionEnabled()) {
+    const max = Number(process.env.INSPECT_PER_RUN ?? INSPECTION.maxPerRun);
+    const targets = alerts.filter((a) => a.payload.ok && a.payload.strategy === 'negotiation' && a.listing.photos?.length).slice(0, Math.max(0, max));
+    const results = await Promise.all(targets.map((a) => inspectListing(a.listing as Listing).catch(() => null)));
+    results.forEach((r, i) => {
+      if (r?.ok) inspections.set(targets[i].listing.id, r.inspection);
+      else if (r) console.warn('[hunt] inspection', targets[i].listing.id, r.error);
+    });
+    Object.assign(summary, { inspected: inspections.size });
+  }
+  for (const alert of alerts) {
     if (!alert.payload.ok) continue;
+    const inspection = inspections.get(alert.listing.id);
+    if (inspection) Object.assign(alert.listing, { inspection });
     // CRM : chaque pépite / cible mandat entre dans le pipeline avec son premier message prêt.
     try {
       const kind = alert.payload.strategy === 'mandate' ? 'mandat' : 'achat';
@@ -186,6 +204,7 @@ async function alertOn(config: Config, priced: ReturnType<typeof priceListings>[
         text: formatTelegramAlert(alert.payload, {
           comparables: alert.market.comparables,
           buyers: matchBuyers(alert.listing, buyers).map((m) => ({ name: m.buyer.name, budgetMax: m.buyer.criteria.budgetMax })),
+          inspection,
         }),
       });
       await markAlertSent(alert.key, { listingId: alert.listing.id, strategy: alert.payload.strategy, score: alert.analysis.score });
@@ -201,7 +220,7 @@ async function alertOn(config: Config, priced: ReturnType<typeof priceListings>[
  * Annonces sans cote : lance une recherche de comparables pour leur modèle (France entière),
  * hors webhook de lot. Plafonnée par run et relancée au plus tous les 14 jours par modèle.
  */
-async function launchOndemand(config: Config, missing: Listing[]) {
+async function launchOndemand(config: Config, missing: Listing[], batchId?: string) {
   const max = Number(process.env.HUNT_ONDEMAND_PER_RUN ?? HUNT_LIMITS.ondemandPerRun);
   if (!(max > 0) || missing.length === 0) return [];
   const sources = ondemandCandidates(missing, { max, skip: await recentOndemandKeys(HUNT_LIMITS.ondemandCooldownDays) });
@@ -215,6 +234,8 @@ async function launchOndemand(config: Config, missing: Listing[]) {
         webhookSecret: config.ingestSecret,
         maxChargeUsd: config.maxChargeUsd,
         bypassSecret: config.bypassSecret,
+        // Rattaché au lot : à sa fin, il relance la recherche suivante du lot (le créneau ne se perd pas).
+        batchId,
       });
       await markOndemand(source);
       launched.push(source.key);
@@ -234,7 +255,7 @@ async function sourceByKey(config: Config, key: string): Promise<HuntSource | un
 }
 
 /** Traite un run Apify terminé : stockage, cote, scoring, alertes Telegram, comparables manquants. */
-export async function ingestRun(runId: string, sourceKey: string) {
+export async function ingestRun(runId: string, sourceKey: string, batchId?: string) {
   const config = huntConfig();
   const source = await sourceByKey(config, sourceKey);
   if (!source) return { ok: false as const, error: 'unknown_source' };
@@ -302,7 +323,7 @@ export async function ingestRun(runId: string, sourceKey: string) {
   summary.priced = priced.length;
   summary.unpriced = unpriced;
   await alertOn(config, priced, summary);
-  summary.ondemand = await launchOndemand(config, missing as Listing[]).catch((error) => {
+  summary.ondemand = await launchOndemand(config, missing as Listing[], batchId).catch((error) => {
     console.error('[hunt] ondemand', error);
     return [];
   });
@@ -326,7 +347,11 @@ async function computeLive() {
   const pending = (missing as Listing[])
     .sort((a, b) => (a.zone === 'france' ? 1 : 0) - (b.zone === 'france' ? 1 : 0) || (a.distanceKm ?? 0) - (b.distanceKm ?? 0))
     .slice(0, 120);
-  return { listings: priced.map((p) => p.listing as Listing), pending, unpriced, poolSize: pool.length, lastRun };
+  // Inspections IA déjà faites : affichées sur les cartes.
+  const listingsOut = priced.map((p) => p.listing as Listing);
+  const inspections = await loadInspections<Inspection>(listingsOut.map((l) => l.id)).catch(() => new Map<string, Inspection>());
+  const withInspection = listingsOut.map((l) => (inspections.has(l.id) ? { ...l, inspection: inspections.get(l.id) } : l));
+  return { listings: withInspection, pending, unpriced, poolSize: pool.length, lastRun };
 }
 
 /** Annonces réelles pour le dashboard (cache 5 min par instance). */
