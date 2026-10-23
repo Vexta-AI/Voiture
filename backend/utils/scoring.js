@@ -28,6 +28,7 @@ import {
   MOTO_A2,
   MOTO_TARGETS,
   NEGOTIATION_LEVERS,
+  MARKET_TRUTH,
   MASTERCLASS,
   PRICE_BANDS,
   PRICE_SIGNALS,
@@ -551,16 +552,24 @@ export function scoreListing(listing, options = {}) {
   const quality = qualitySignals(text);
   if (quality.owners !== null && quality.owners >= 4) warnings.push(`${quality.owners} propriétaires : historique chargé, décote à la revente.`);
   const stats = listing.marketStats;
+  const isEv = MARKET_TRUTH.evPattern.test(text);
+  const slowDays = isEv ? MARKET_TRUTH.evSlowDays : MARKET_TRUTH.slowDays;
   if (stats?.daysOnMarket !== null && stats?.daysOnMarket !== undefined) {
     insights.push(
-      stats.daysOnMarket >= 45
-        ? `Marché lent : les ${stats.comparables} annonces similaires sont en ligne depuis ${stats.daysOnMarket} jours (médiane). Prévoir du temps pour revendre.`
-        : `Marché actif : les annonces similaires sont en ligne depuis ${stats.daysOnMarket} jours (médiane).`,
+      stats.daysOnMarket >= slowDays
+        ? `Marché lent : les ${stats.comparables} annonces similaires sont en ligne depuis ${stats.daysOnMarket} jours (médiane), au-delà de la moyenne leboncoin (${slowDays} j). Prévoir du temps pour revendre.`
+        : `Délai de revente : annonces similaires en ligne depuis ${stats.daysOnMarket} jours (médiane ; moyenne leboncoin ≈ ${slowDays} j${isEv ? ' en électrique' : ''}).`,
     );
+  } else if (isEv) {
+    insights.push(`Électrique : délai de revente moyen ≈ ${MARKET_TRUTH.evSlowDays} jours sur leboncoin (L'argus 2025), contre ~90 j en thermique.`);
   }
   // Revente chez toi : la marge réelle si tu revends au prix des annonces de ta zone.
   const local = listing.localMarket ?? null;
   const localMargin = local ? local.price - askingPrice - fixedCosts - purchaseCosts : null;
+  // Marge prudente : ton acheteur négociera aussi (3 à 8 % selon le secteur) sur le prix de revente.
+  const resaleBase = local?.price ?? marketPrice;
+  const buyerDiscount = Math.round((resaleBase * MARKET_TRUTH.buyerDiscountRate) / 50) * 50;
+  const prudentMargin = (localMargin ?? realNetMargin) - buyerDiscount;
   if (local && localMargin !== null) {
     insights.push(
       `Revente chez toi (${local.comparables} annonces à moins de ${local.radiusKm} km) : ${local.price.toLocaleString('fr-FR')} € → marge réelle ${localMargin >= 0 ? '+' : ''}${localMargin.toLocaleString('fr-FR')} €.`,
@@ -611,6 +620,7 @@ export function scoreListing(listing, options = {}) {
     masterclass,
     priceReasons: why,
     quality,
+    prudent: { margin: prudentMargin, buyerDiscount, slowDays, isEv },
     local: local && localMargin !== null ? { ...local, margin: localMargin } : null,
     market: stats ? { ...stats, argus: listing.argusPrice ?? null } : listing.argusPrice ? { argus: listing.argusPrice } : null,
     score,

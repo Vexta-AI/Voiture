@@ -114,7 +114,9 @@ export function ListingCard({
           <dd className="tabular text-sm font-semibold text-ink-900">{eur(listing.price)}</dd>
         </div>
         <div className="border-x border-ink-100 px-2 py-2.5">
-          <dt className="text-[11px] uppercase tracking-wide text-ink-400">Cote pro</dt>
+          <dt className="text-[11px] uppercase tracking-wide text-ink-400" title="Médiane des prix affichés des annonces comparables (pas l'Argus)">
+            Prix marché
+          </dt>
           <dd className="tabular text-sm font-semibold text-ink-900">{eur(listing.marketPrice)}</dd>
         </div>
         <div className="px-2 py-2.5">
@@ -156,7 +158,7 @@ export function ListingCard({
             </span>
           )}
           {analysis.market && 'daysOnMarket' in analysis.market && analysis.market.daysOnMarket !== null && (
-            <span className={cn(analysis.market.daysOnMarket >= 45 && 'text-amber-700 dark:text-amber-300')} title="Depuis combien de jours les annonces similaires sont en ligne (médiane)">
+            <span className={cn(analysis.market.daysOnMarket >= analysis.prudent.slowDays && 'text-amber-700 dark:text-amber-300')} title="Depuis combien de jours les annonces similaires sont en ligne (médiane)">
               Délai de vente ≈ <strong className="tabular">{analysis.market.daysOnMarket} j</strong>
             </span>
           )}

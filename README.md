@@ -168,6 +168,27 @@ Le radar remplit le CRM tout seul : chaque PÉPITE ou cible mandat alertée devi
 
 Stockage : Vercel Blob (`crm/deals/<id>.json`). API : `GET/POST /api/crm`, `PATCH/DELETE /api/crm/:id` (protégées par le mot de passe du dashboard). L'envoi reste un copier-coller : LeBonCoin n'a pas d'API de messagerie et bannit les envois automatisés.
 
+## Sources & hypothèses (rien d'inventé)
+
+Chaque chiffre du radar est soit **sourcé**, soit **un choix métier signalé comme tel**. Aucune base de données publique ne donne de cote pro gratuite : le « prix marché » du radar est la **médiane des prix affichés** d'annonces comparables collectées, pas l'Argus ni un prix de vente réel.
+
+| Paramètre | Valeur radar | Ce que disent les pros / la statistique | Statut |
+|---|---|---|---|
+| Prix marché | médiane des annonces comparables (≥ 4, années ±1-2, km proches) | Méthode des négociants : comparer les annonces similaires ([Debard Automobiles](https://www.debardautomobiles.com/actualites/blog/comment-un-negociant-auto-fixe-le-prix-dun-vehicule-doccasion)) | Prix **affichés**, pas de vente |
+| Négo de ton acheteur à la revente | −5 % dans la « marge prudente » | 3 à 8 % de négo intégrée aux annonces ([Joinsteer](https://www.joinsteer.com/car/guide/negocier-prix-occasion), [Caroom](https://www.caroom.fr/guide/occasion/achat/prix)) | Sourcé (guides, pas d'étude officielle) |
+| Remise demandée au vendeur | ~10 %, +5 % à J+15, 800-2 500 € | 5-10 % réaliste, jusqu'à 15 % si réparations ou annonce de plus d'un mois ([Joinsteer](https://www.joinsteer.com/car/guide/negocier-prix-occasion), [Caradisiac](https://www.caradisiac.com/Achat-d-une-voiture-d-occasion-vos-armes-pour-negocier-92992.htm)) | Sourcé |
+| Remise en état | 350 € (detailing + petite méca, ton cursus) | Négociant : ~600 € + 120 € de préparation sur une 9 900 € ([Debard](https://www.debardautomobiles.com/actualites/blog/comment-un-negociant-auto-fixe-le-prix-dun-vehicule-doccasion)) ; factures finales souvent 50-100 % au-dessus du devis ([Autocopilot](https://autocopilot.fr/guides/rentabilite-achat-revente-voiture)) | **Optimiste** : à valider |
+| Capital risque | 200 € | Choix métier (imprévus) | Choix métier |
+| Marge moyenne de la profession | — | ~500 € HT/véhicule de marge brute d'activité VO ([L'argus, baromètre](https://www.largus.fr/pros/actualite-automobile/barometre-occasion-la-profession-dans-l-escalier-de-la-baisse-des-prix-30029937.html)) | Repère : tes seuils pépite (1 000 / 2 000 € réels) visent 2 à 4× la moyenne |
+| Délai de vente « marché lent » | > 90 j (> 145 j en électrique) | ~90-95 j sur leboncoin en thermique, ~145 j en électrique ([L'argus 2025](https://www.largus.fr/pros/actualite-automobile/voitures-d-occasion-les-prix-ne-baissent-plus-depuis-le-mois-de-septembre-30045002.html)) | Sourcé |
+| Gros rouleur | > 25 000 km/an | Moyenne française 11 600 km/an en 2024 ([SDES](https://www.statistiques.developpement-durable.gouv.fr/397-millions-de-voitures-en-circulation-en-france-au-1er-janvier-2025)) | Seuil ≈ 2× la moyenne |
+| Carte grise | 58 €/CV Nouvelle-Aquitaine, ÷ 2 après 10 ans, + 13,76 € | Tarif au 1er mars 2026 ([Cartegriseminute](https://www.cartegriseminute.fr/nouveau-prix-cheval-fiscal-nouvelle-aquitaine-2026.php)) | Sourcé ; CV estimés si absents (signalé « estimés ») |
+| Malus | non appliqué | Uniquement à la 1re immatriculation en France (import) ([Journal de l'Auto](https://journalauto.com/industrie/malus-pour-les-voitures-doccasion-seuls-les-modeles-importes-sont-concernes/)) | Sourcé |
+| TVA en pro | non déduite | Franchise en base : 85 000 € de CA en vente de marchandises en 2026 ([Legifiscal](https://www.legifiscal.fr/actualites-fiscales/4436-nouveaux-seuils-micro-entreprises-annee-2026.html)) ; au-delà, TVA sur la marge (art. 297 A du CGI) | À valider avec un comptable avant de passer pro |
+| Bonus campagne, points forts, MASTERCLASS | +5 / +2 par point / ×2 seuil | Choix métier pour trier (ne changent jamais la marge) | Choix métier |
+
+Les heuristiques de lecture (vendeur pressé, risques, points forts) lisent **ce que l'annonce écrit** : elles n'inventent rien, mais un vendeur peut mentir. Photos, HistoVec et essai restent obligatoires.
+
 ## Outreach autonome (Make.com)
 
 `POST /api/outreach` prend une annonce et renvoie un message prêt à envoyer. L'annonce est **toujours re-scorée côté serveur**.
