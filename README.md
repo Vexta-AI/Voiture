@@ -22,7 +22,7 @@ Déploiement Vercel : importer le repo, aucun réglage requis. Variables optionn
 | `CRON_SECRET` / `INGEST_SECRET` | secrets du cron et du webhook Apify (générés à la création du projet) |
 | `BLOB_READ_WRITE_TOKEN` | stockage Vercel Blob (posé par l'intégration Blob) |
 | `HUNT_TYPES` (`auto` ou `auto,moto`), `HUNT_AREA`, `HUNT_MAX_ITEMS`, `HUNT_MARKET_MAX_ITEMS`, `APIFY_MAX_CHARGE_USD`, `HUNT_SOURCES` | réglages de la chasse (optionnels) |
-| `DASHBOARD_PASSWORD` | protège tout le site par mot de passe (identifiant libre) ; `/api/hunt/*` garde ses propres secrets |
+| `DASHBOARD_PASSWORD` | protège tout le site par mot de passe (identifiant libre) ; `/api/hunt/*` garde ses propres secrets. **Obligatoire en production** : sans lui, le site répond 503 plutôt que d'être ouvert |
 | `ANTHROPIC_API_KEY` | active « Affiner avec l'IA » dans l'éditeur de messages |
 | `OUTREACH_API_KEY` | clé exigée (en-tête `x-api-key`) pour pousser un payload vers Make |
 | `MAKE_WEBHOOK_URL` | URL du webhook Make.com qui reçoit les payloads `dispatch` |
@@ -179,7 +179,7 @@ Chaque personne qui te dit ce qu'elle cherche (modèles, budget max, année min,
 - dans les alertes Telegram (« Acheteur(s) prêt(s) ») ;
 - dans l'onglet Acheteurs, sur les voitures du CRM, avec le message prêt et la création de la fiche acheteur en un clic.
 
-**Formulaire public `/cherche`** (sans mot de passe) : les acheteurs laissent eux-mêmes leurs critères et leurs coordonnées, avec une case de consentement obligatoire (date enregistrée). Ils rejoignent le réseau et tu reçois une notification Telegram. Variables optionnelles : `PUBLIC_BRAND` (ton nom commercial, affiché comme responsable) et `PUBLIC_CONTACT` (e-mail ou téléphone pour les demandes de suppression). On ne collecte jamais de coordonnées sur des forums ou des réseaux sociaux : la CNIL exige le consentement avant tout démarchage ([CNIL](https://www.cnil.fr/fr/la-reutilisation-des-donnees-publiquement-accessibles-en-ligne-des-fins-de-demarchage-commercial)).
+**Formulaire public `/cherche`** (sans mot de passe) : les acheteurs laissent eux-mêmes leurs critères et leurs coordonnées, avec une case de consentement obligatoire (date enregistrée). Chaque inscription arrive **en pause** : tu la valides (✓ Valider) avant qu'elle entre dans le matching et les alertes, et le formulaire refuse plus de 20 inscriptions par heure (anti-spam, choix métier). Tu reçois une notification Telegram. Variables optionnelles : `PUBLIC_BRAND` (ton nom commercial, affiché comme responsable) et `PUBLIC_CONTACT` (e-mail ou téléphone pour les demandes de suppression). On ne collecte jamais de coordonnées sur des forums ou des réseaux sociaux : la CNIL exige le consentement avant tout démarchage ([CNIL](https://www.cnil.fr/fr/la-reutilisation-des-donnees-publiquement-accessibles-en-ligne-des-fins-de-demarchage-commercial)).
 
 **Annonces republiées** : un vendeur qui supprime et remet son annonce pour paraître récente est repéré grâce à l'empreinte du véhicule (même modèle, même année, km à 2 000 près, même code postal). Le temps en ligne repart de la première annonce, ce qui compte pour le levier de négociation et le mandat J+15, et la carte affiche « 🔁 Republiée ».
 

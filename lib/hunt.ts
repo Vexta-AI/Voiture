@@ -220,7 +220,7 @@ async function alertOn(config: Config, priced: ReturnType<typeof priceListings>[
  * Annonces sans cote : lance une recherche de comparables pour leur modèle (France entière),
  * hors webhook de lot. Plafonnée par run et relancée au plus tous les 14 jours par modèle.
  */
-async function launchOndemand(config: Config, missing: Listing[]) {
+async function launchOndemand(config: Config, missing: Listing[], batchId?: string) {
   const max = Number(process.env.HUNT_ONDEMAND_PER_RUN ?? HUNT_LIMITS.ondemandPerRun);
   if (!(max > 0) || missing.length === 0) return [];
   const sources = ondemandCandidates(missing, { max, skip: await recentOndemandKeys(HUNT_LIMITS.ondemandCooldownDays) });
@@ -234,6 +234,8 @@ async function launchOndemand(config: Config, missing: Listing[]) {
         webhookSecret: config.ingestSecret,
         maxChargeUsd: config.maxChargeUsd,
         bypassSecret: config.bypassSecret,
+        // Rattaché au lot : à sa fin, il relance la recherche suivante du lot (le créneau ne se perd pas).
+        batchId,
       });
       await markOndemand(source);
       launched.push(source.key);
@@ -253,7 +255,7 @@ async function sourceByKey(config: Config, key: string): Promise<HuntSource | un
 }
 
 /** Traite un run Apify terminé : stockage, cote, scoring, alertes Telegram, comparables manquants. */
-export async function ingestRun(runId: string, sourceKey: string) {
+export async function ingestRun(runId: string, sourceKey: string, batchId?: string) {
   const config = huntConfig();
   const source = await sourceByKey(config, sourceKey);
   if (!source) return { ok: false as const, error: 'unknown_source' };
@@ -321,7 +323,7 @@ export async function ingestRun(runId: string, sourceKey: string) {
   summary.priced = priced.length;
   summary.unpriced = unpriced;
   await alertOn(config, priced, summary);
-  summary.ondemand = await launchOndemand(config, missing as Listing[]).catch((error) => {
+  summary.ondemand = await launchOndemand(config, missing as Listing[], batchId).catch((error) => {
     console.error('[hunt] ondemand', error);
     return [];
   });

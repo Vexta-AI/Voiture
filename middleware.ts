@@ -29,7 +29,12 @@ function passwordFrom(request: NextRequest) {
 
 export function middleware(request: NextRequest) {
   const expected = process.env.DASHBOARD_PASSWORD;
-  if (!expected) return NextResponse.next();
+  if (!expected) {
+    // En production, sans mot de passe tout serait public (CRM, acheteurs, IA payante) : on ferme.
+    // Les préversions Vercel restent derrière la protection Vercel (connexion au compte).
+    if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV !== 'preview') return new NextResponse('DASHBOARD_PASSWORD manquant', { status: 503 });
+    return NextResponse.next();
+  }
 
   const provided = passwordFrom(request);
   if (provided !== null && safeEqual(provided, expected)) return NextResponse.next();

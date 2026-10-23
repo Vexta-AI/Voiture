@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { BlobNotFoundError, del, get, head, list, put } from '@vercel/blob';
+import { BlobNotFoundError, BlobPreconditionFailedError, del, get, head, list, put } from '@vercel/blob';
 
 import type { Listing } from './types';
 
@@ -83,8 +83,11 @@ export async function loadRuns(days: number): Promise<StoredRun[]> {
 /** Supprime les runs plus vieux que `days` jours. */
 export async function pruneRuns(days: number) {
   const before = Date.now() - days * 86_400_000;
-  const old = (await listAll(RUNS_PREFIX)).filter((b) => b.uploadedAt.getTime() < before);
-  if (old.length) await del(old.map((b) => b.url));
+  // Runs, journaux, lots, réservations et inspections au-delà de la rétention : supprimés pour garder les lectures légères.
+  // Les marqueurs d'alerte restent (anti-doublon) : ils sont minuscules.
+  const prefixes = [RUNS_PREFIX, LOG_PREFIX, BATCHES_PREFIX, CLAIMS_PREFIX, INSPECTIONS_PREFIX];
+  const old = (await Promise.all(prefixes.map((p) => listAll(p)))).flat().filter((b) => b.uploadedAt.getTime() < before);
+  for (let i = 0; i < old.length; i += 500) await del(old.slice(i, i + 500).map((b) => b.url));
   return old.length;
 }
 
@@ -212,7 +215,30 @@ export async function inspectSpend(month = new Date().toISOString().slice(0, 7))
   return (await readJson<{ usd: number; count: number }>(`${INSPECT_SPEND_PREFIX}${month}.json`)) ?? { usd: 0, count: 0 };
 }
 
+/** Ajoute une dépense au compteur du mois, en écriture conditionnelle (deux inspections simultanées ne s'écrasent pas). */
 export async function addInspectSpend(usd: number, month = new Date().toISOString().slice(0, 7)) {
-  const current = await inspectSpend(month);
-  await writeJson(`${INSPECT_SPEND_PREFIX}${month}.json`, { usd: Math.round((current.usd + usd) * 10_000) / 10_000, count: current.count + 1 }, true);
+  const pathname = `${INSPECT_SPEND_PREFIX}${month}.json`;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const result = await get(pathname, { access: 'private', useCache: false }).catch((error) => {
+      if (error instanceof BlobNotFoundError) return null;
+      throw error;
+    });
+    const found = result && result.statusCode === 200;
+    const current = found ? ((await new Response(result.stream).json()) as { usd: number; count: number }) : { usd: 0, count: 0 };
+    const next = JSON.stringify({ usd: Math.round((current.usd + usd) * 10_000) / 10_000, count: current.count + 1 });
+    try {
+      await put(pathname, next, {
+        access: 'private',
+        addRandomSuffix: false,
+        contentType: 'application/json',
+        ...(found ? { ifMatch: result.blob.etag } : { allowOverwrite: false }),
+      });
+      return;
+    } catch (error) {
+      // Quelqu'un a écrit entre-temps (ETag changé, ou fichier créé) : on relit et on recommence.
+      if (error instanceof BlobPreconditionFailedError || (!found && error instanceof Error && /already exists/i.test(error.message))) continue;
+      throw error;
+    }
+  }
+  throw new Error('Compteur de dépense IA : trop d’écritures concurrentes');
 }

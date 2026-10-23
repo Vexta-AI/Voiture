@@ -212,6 +212,16 @@ describe('Telegram', () => {
     assert.ok(text.length <= 4096);
   });
 
+  it('reste sous 4 096 caractères même avec beaucoup d’acheteurs aux noms longs', () => {
+    assert.ok(alert.payload.ok);
+    if (!alert.payload.ok) return;
+    const buyers = Array.from({ length: 60 }, (_, i) => ({ name: `${'X'.repeat(95)}${i}`, budgetMax: 99_000 }));
+    const text = formatTelegramAlert(alert.payload, { comparables: 5, buyers });
+    assert.ok(text.length <= 4096, `longueur ${text.length}`);
+    assert.match(text, /\+57 autre\(s\)/);
+    assert.match(text, /<pre>[\s\S]+<\/pre>$/);
+  });
+
   it('envoie via l’API Bot avec parse_mode HTML', async () => {
     let call;
     const fetchImpl = async (url, init) => {

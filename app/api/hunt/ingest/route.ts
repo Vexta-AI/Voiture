@@ -35,15 +35,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'missing_run_id' }, { status: 400 });
   }
 
+  // Le run est terminé (succès ou échec) : un créneau Apify se libère. La recherche suivante du lot passe
+  // en premier, avant les comparables à la demande lancés pendant l'ingestion (sinon ils prennent le créneau
+  // et le lot s'arrête).
+  const next = batch ? await continueBatch(batch).catch((error) => (console.error('[api/hunt/ingest] next', error), [])) : [];
   let summary: Awaited<ReturnType<typeof ingestRun>> | { ok: false; error: string };
   try {
-    summary = await ingestRun(runId, source);
+    summary = await ingestRun(runId, source, batch ?? undefined);
   } catch (error) {
     console.error('[api/hunt/ingest]', error);
     summary = { ok: false, error: 'ingest_failed' };
   }
-  // Le run est terminé (succès ou échec) : un créneau Apify se libère, on lance la recherche suivante du lot.
-  const next = batch ? await continueBatch(batch).catch((error) => (console.error('[api/hunt/ingest] next', error), [])) : [];
   await logIngest({ runId, source, batch, summary, next }).catch((error) => console.error('[api/hunt/ingest] log', error));
   // 200 même pour un run en échec : rien à rejouer côté Apify, le résumé suffit au diagnostic.
   return NextResponse.json({ ...summary, next }, { status: summary.ok === false && summary.error === 'ingest_failed' ? 500 : 200 });

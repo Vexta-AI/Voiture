@@ -45,16 +45,23 @@ export function formatTelegramAlert(payload, context = {}) {
   if (context.inspection) lines.push(escape(inspectionLine(context.inspection, listing.mileage)));
   else if (payload.strategy === 'negotiation') lines.push(`👀 <i>À regarder sur les photos :</i> ${PHOTO_CHECKLIST.map((c) => escape(c.split(' : ')[0].toLowerCase())).join(', ')}`);
   if (context.buyers?.length) {
-    lines.push(`👥 <b>Acheteur(s) prêt(s)</b> : ${context.buyers.map((b) => `${escape(b.name)} (budget ${eur(b.budgetMax)})`).join(', ')}`);
+    const shown = context.buyers.slice(0, 3).map((b) => `${escape(String(b.name).slice(0, 40))} (budget ${eur(b.budgetMax)})`);
+    const more = context.buyers.length > 3 ? ` +${context.buyers.length - 3} autre(s)` : '';
+    lines.push(`👥 <b>Acheteur(s) prêt(s)</b> : ${shown.join(', ')}${more}`);
   }
   const url = adUrl(listing);
   if (url) lines.push(`<a href="${escape(url)}">👉 Ouvrir l'annonce</a>`);
   lines.push('', '<b>Message à envoyer :</b>');
 
+  // L'en-tête ne doit jamais dépasser la limite : le message vendeur garde au moins 600 caractères.
+  // On retire des lignes de détail (jamais une balise coupée en deux) tant que l'en-tête est trop long.
+  while (lines.length > 5 && lines.join('\n').length > MAX_LENGTH - 700) lines.splice(lines.length - 3, 1);
   const header = lines.join('\n');
   const room = MAX_LENGTH - header.length - 20;
-  const body = message.body.length > room ? `${message.body.slice(0, room)}…` : message.body;
-  return `${header}\n<pre>${escape(body)}</pre>`;
+  // Échappement d'abord, coupe ensuite : la longueur comptée est celle réellement envoyée.
+  const escaped = escape(message.body);
+  const body = escaped.length > room ? `${escaped.slice(0, room).replace(/&[a-z]*$/, '')}…` : escaped;
+  return `${header}\n<pre>${body}</pre>`;
 }
 
 /**
