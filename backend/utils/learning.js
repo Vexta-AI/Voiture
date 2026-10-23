@@ -10,7 +10,7 @@
  * Rien n'est changé automatiquement : chaque ajustement est une proposition à valider (CLAUDE.md).
  */
 
-import { COSTS, MARKET_TRUTH } from '../config/rules.js';
+import { BUSINESS, COSTS, MARKET_TRUTH } from '../config/rules.js';
 
 /** En dessous de ce nombre de deals, une mesure est affichée mais jamais proposée comme règle. */
 export const LEARNING = { minSample: 3 };
@@ -91,7 +91,9 @@ export function learnFromDeals(deals) {
     .map((d) => {
       const n = d.numbers;
       const costs = Number(n.reconditioning ?? COSTS.RECONDITIONING_BASE) + Number(n.registrationCost ?? 0) + Number(n.transportCost ?? 0) + Number(n.ownershipCost ?? 0) + Number(n.extraCosts ?? 0);
-      return n.soldPrice - n.purchasePrice - costs - Number(n.realNetMargin);
+      // Cotisations micro sur le prix encaissé : déjà comptées dans la marge prévue, à déduire aussi de l'encaissé.
+      const charges = BUSINESS.status === 'micro' ? Math.round(n.soldPrice * BUSINESS.salesSocialRate) : 0;
+      return n.soldPrice - n.purchasePrice - costs - charges - Number(n.realNetMargin);
     });
 
   const measures = {

@@ -10,7 +10,7 @@
  */
 
 import { DOCUMENTS, FOLLOW_UP, HEAT, PIPELINES, RESALE } from '../config/crm.js';
-import { COSTS, MANDATE, REGISTRATION } from '../config/rules.js';
+import { BUSINESS, COSTS, MANDATE, REGISTRATION } from '../config/rules.js';
 import { adUrl } from './links.js';
 import { clamp, normalize } from './text.js';
 
@@ -70,6 +70,7 @@ export function createDeal({ kind, listing, analysis, message = null, offerPrice
           salePrice: analysis.mandate?.salePrice ?? listing.marketPrice,
           commission: analysis.mandate?.commission ?? 0,
           upsellMargin: analysis.mandate?.upsellMargin ?? 0,
+          upsellBilled: analysis.mandate?.upsellBilled ?? 0,
           score: analysis.score,
         }
       : {
@@ -632,18 +633,29 @@ export function applyAction(deal, action, now = new Date()) {
  */
 export function dealEconomics(deal) {
   const n = deal.numbers;
+  const micro = BUSINESS.status === 'micro';
   if (deal.kind === 'mandat') {
     const net = n.ownerNet ?? 0;
-    const expected = (n.listedPrice ?? n.salePrice ?? 0) - net + (n.upsellMargin ?? 0);
-    const realized = n.soldPrice ? n.soldPrice - net + (n.upsellMargin ?? 0) : null;
+    // Micro : cotisations sur ce que tu factures (commission + upsells), comme dans le scoring.
+    const charges = (sell) => (micro ? Math.round((sell - net + (n.upsellBilled ?? n.upsellMargin ?? 0)) * BUSINESS.servicesSocialRate) : 0);
+    const listed = n.listedPrice ?? n.salePrice ?? 0;
+    const expected = listed - net + (n.upsellMargin ?? 0) - charges(listed);
+    const realized = n.soldPrice ? n.soldPrice - net + (n.upsellMargin ?? 0) - charges(n.soldPrice) : null;
     return { expected, realized, invested: 0 };
   }
   if (deal.kind === 'revente') return { expected: 0, realized: null, invested: 0 };
   const costs = (n.reconditioning ?? COSTS.RECONDITIONING_BASE) + (n.registrationCost ?? 0) + (n.transportCost ?? 0) + (n.ownershipCost ?? 0) + (n.extraCosts ?? 0);
+  // Micro : 12,3 % du prix de revente réellement encaissé (ou visé) part en cotisations, comme dans le scoring.
+  const charges = (sell) => (micro ? Math.round(sell * BUSINESS.salesSocialRate) : 0);
   const buy = n.purchasePrice ?? n.offerPrice ?? n.askingPrice ?? 0;
   const sell = n.soldPrice ?? n.listedPrice ?? n.marketPrice ?? 0;
-  const expected = sell - buy - costs - (n.soldPrice ? 0 : COSTS.RISK_CAPITAL);
-  return { expected, realized: n.soldPrice && n.purchasePrice ? n.soldPrice - n.purchasePrice - costs : null, invested: n.purchasePrice ? n.purchasePrice + costs : 0 };
+  const expected = sell - buy - costs - charges(sell) - (n.soldPrice ? 0 : COSTS.RISK_CAPITAL);
+  return {
+    expected,
+    realized: n.soldPrice && n.purchasePrice ? n.soldPrice - n.purchasePrice - costs - charges(n.soldPrice) : null,
+    invested: n.purchasePrice ? n.purchasePrice + costs : 0,
+    socialCharges: charges(sell),
+  };
 }
 
 /**
