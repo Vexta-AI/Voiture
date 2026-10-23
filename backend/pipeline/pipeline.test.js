@@ -426,3 +426,24 @@ describe('Comparables fiables', () => {
     assert.ok(m?.criteria.some((c) => c.includes('écartée')));
   });
 });
+
+describe('Fiabilité de la cote', () => {
+  it('beaucoup de comparables serrés et vérifiés = haute ; peu et dispersés = faible', async () => {
+    const { marketConfidence } = await import('./market.js');
+    assert.equal(marketConfidence({ comparables: 10, low: 8800, high: 9300, price: 9000, verified: 3, window: 'serré' }).level, 'haute');
+    assert.equal(marketConfidence({ comparables: 4, low: 6000, high: 9000, price: 7500, verified: 0, window: 'élargi' }).level, 'faible');
+  });
+
+  it('liste les annonces comparées et ne déclenche pas d’alerte sur une cote faible', async () => {
+    const { estimateMarketPrice } = await import('./market.js');
+    const target = listing({ ad_id: 700, price: 6000 });
+    const tight = comps([8900, 9000, 9100, 9200]);
+    const m = estimateMarketPrice(target, tight);
+    assert.equal(m?.samples.length, 4);
+    assert.ok(m?.samples[0].url?.startsWith('https://www.leboncoin.fr/ad/'));
+    const spread = comps([6000, 8000, 11000, 14000]);
+    const weak = priceListings([listing({ ad_id: 701, price: 5000 })], spread);
+    assert.equal(weak.priced[0].market.confidence.level, 'faible');
+    assert.equal(selectAlerts(weak.priced, { now: NOW }).length, 0);
+  });
+});

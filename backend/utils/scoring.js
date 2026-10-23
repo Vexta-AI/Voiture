@@ -605,8 +605,14 @@ export function scoreListing(listing, options = {}) {
     const gap = Math.round(((listing.argusPrice - marketPrice) / listing.argusPrice) * 100);
     insights.push(`Cote Argus ${listing.argusPrice.toLocaleString('fr-FR')} € : le marché actuel est ${gap >= 0 ? `${gap} % en dessous` : `${-gap} % au-dessus`}.`);
   }
+  const confidence = listing.marketStats?.confidence ?? null;
+  if (confidence?.level === 'faible' && status.key === 'PEPITE') {
+    warnings.push(`Cote peu fiable (${listing.marketStats?.comparables} comparables, prix dispersés à ${confidence.spreadPct} %) : vérifie les annonces comparées avant de bouger. Pas d'alerte.`);
+  }
   const masterclass =
     status.key === 'PEPITE' &&
+    // MASTERCLASS : seulement sur une cote très fiable.
+    (confidence === null || confidence.level === 'haute') &&
     realNetMargin >= threshold * MASTERCLASS.marginMultiplier &&
     why.risks.length === 0 &&
     marketPrice > 0 &&

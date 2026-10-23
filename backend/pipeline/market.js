@@ -9,6 +9,7 @@
  */
 
 import { PRICE_SIGNALS } from '../config/rules.js';
+import { adUrl } from '../utils/links.js';
 import { compact, findPattern, normalize } from '../utils/text.js';
 import { distanceKm } from './geo.js';
 
@@ -93,6 +94,23 @@ export function powerOf(listing) {
   return code && Number(code[1]) >= 50 ? Number(code[1]) : null;
 }
 
+/**
+ * Fiabilité de la cote (0-100) : nombre de comparables, dispersion des prix (écart entre le quart bas
+ * et le quart haut, rapporté à la médiane), critères de motorisation vérifiés, fenêtre serrée ou élargie.
+ * Haute >= 70, moyenne >= 45, faible sinon (ou si les prix sont dispersés à plus de 35 %).
+ * Une cote faible ne déclenche jamais d'alerte.
+ */
+export function marketConfidence({ comparables, low, high, price, verified, window }) {
+  const spread = price > 0 ? (high - low) / price : 1;
+  let score = comparables >= 10 ? 40 : comparables >= 6 ? 30 : comparables >= 4 ? 20 : 10;
+  score += spread <= 0.12 ? 30 : spread <= 0.2 ? 20 : spread <= 0.3 ? 10 : 0;
+  score += verified >= 3 ? 20 : verified === 2 ? 12 : verified === 1 ? 5 : 0;
+  if (window === 'serré') score += 10;
+  // Prix trop dispersés (écart quart bas / quart haut > 35 % de la médiane) : la médiane ne veut rien dire.
+  const level = spread > 0.35 ? 'faible' : score >= 70 ? 'haute' : score >= 45 ? 'moyenne' : 'faible';
+  return { score, level: /** @type {'haute'|'moyenne'|'faible'} */ (level), spreadPct: Math.round(spread * 100) };
+}
+
 /** Annonce à écarter des comparables : accidentée, en panne, papiers douteux… (prix tiré vers le bas). */
 export function isDamaged(listing) {
   const t = normalize(`${listing.title ?? ''} ${listing.description ?? ''}`);
@@ -157,14 +175,24 @@ export function estimateMarketPrice(listing, pool, minComparables = MARKET_RULES
       .map((p) => Math.floor((now - new Date(p.publishedAt).getTime()) / 86_400_000))
       .filter((d) => Number.isFinite(d) && d >= 0)
       .sort((a, b) => a - b);
+    const price = round(quantile(prices, 0.5));
+    const low = round(quantile(prices, 0.25));
+    const high = round(quantile(prices, 0.75));
+    const verified = [fuel, gearbox, power].filter(Boolean).length;
     return {
       daysOnMarket: days.length ? Math.round(quantile(days, 0.5)) : null,
-      price: round(quantile(prices, 0.5)),
+      price,
       comparables: comps.length,
       window: w.label,
       criteria,
-      low: round(quantile(prices, 0.25)),
-      high: round(quantile(prices, 0.75)),
+      low,
+      high,
+      confidence: marketConfidence({ comparables: comps.length, low, high, price, verified, window: w.label }),
+      // Les annonces réellement comparées, pour vérifier toi-même (12 max, du moins cher au plus cher).
+      samples: [...comps]
+        .sort((a, b) => a.price - b.price)
+        .slice(0, 12)
+        .map((p) => ({ id: p.id, title: p.title, price: p.price, year: p.year, mileage: p.mileage, location: p.location ?? null, url: adUrl(p) })),
     };
   }
   return null;
