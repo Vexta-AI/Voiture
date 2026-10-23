@@ -137,6 +137,11 @@ export function normalizeApifyItem(item, context) {
       version: title,
       engine: attr(item, 'engine', 'cubic_capacity') ? String(attr(item, 'engine', 'cubic_capacity')) : undefined,
       gearbox: attr(item, 'gearbox') ? String(attr(item, 'gearbox')) : undefined,
+      fuel: attr(item, 'fuel', 'energie', 'energy') ? String(attr(item, 'fuel', 'energie', 'energy')) : undefined,
+      powerDin: (() => {
+        const p = toInt(attr(item, 'horse_power_din', 'power_din', 'puissance_din'));
+        return p && p >= 30 && p <= 1000 ? p : undefined;
+      })(),
       year,
       mileage: toInt(attr(item, 'mileage', 'kilometrage')) ?? 0,
       price,

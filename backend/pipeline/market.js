@@ -8,7 +8,8 @@
  * Pas assez de comparables = pas de cote = pas de scoring (on n'invente jamais une marge).
  */
 
-import { compact, normalize } from '../utils/text.js';
+import { PRICE_SIGNALS } from '../config/rules.js';
+import { compact, findPattern, normalize } from '../utils/text.js';
 import { distanceKm } from './geo.js';
 
 export const MARKET_RULES = {
@@ -16,8 +17,8 @@ export const MARKET_RULES = {
   minComparables: 4,
   /** Fenêtres de recherche, de la plus stricte à la plus large. */
   windows: [
-    { years: 1, mileageRatio: 0.35, mileageFloor: 20000, label: 'serré' },
-    { years: 2, mileageRatio: 0.6, mileageFloor: 30000, label: 'élargi' },
+    { years: 1, mileageRatio: 0.35, mileageFloor: 20000, powerRate: 0.15, label: 'serré' },
+    { years: 2, mileageRatio: 0.6, mileageFloor: 30000, powerRate: 0.25, label: 'élargi' },
   ],
   /** Au-delà de ce nombre de comparables, on retire 10 % en haut et en bas (annonces aberrantes). */
   trimFrom: 10,
@@ -58,6 +59,46 @@ export function modelKey(listing) {
   return `${listing.type}:${compact(listing.brand)}:${titleModel && !model.includes(titleModel) ? `${model}-${titleModel}` : model}:${variantOf(listing)}`;
 }
 
+const textOf = (l) => normalize([l.title, l.version, l.engine, l.gearbox, l.fuel].filter(Boolean).join(' '));
+
+/** Carburant : attribut LeBonCoin, sinon déduit de la motorisation ("1.5 dCi" = diesel). null si inconnu. */
+export function fuelOf(listing) {
+  const f = normalize(listing.fuel ?? '');
+  const t = `${f} ${textOf(listing)}`;
+  if (/electrique|\bev\b|e-tech electrique|\bzoe\b|e-208|e-2008|tesla/.test(t)) return 'electrique';
+  if (/hybride|e-tech|\bhev\b|phev|full hybrid|rechargeable/.test(t)) return 'hybride';
+  if (/diesel|gazole|\bdci\b|\btdi\b|\bhdi\b|bluehdi|\bcrdi\b|\bcdi\b|multijet|\bjtd|\bd4d\b|\btdci\b|\bblue ?dci\b|\b\d{3}d\b/.test(t)) return 'diesel';
+  if (/essence|\btce\b|\btsi\b|\btfsi\b|puretech|\bvti\b|\bthp\b|\bsce\b|\bmpi\b|ecoboost|\bvvt|\bgti\b|\bfsi\b/.test(t)) return 'essence';
+  return null;
+}
+
+/** Boîte : 'auto' (EDC, DSG, BVA, EAT…) ou 'manuelle' ; null si inconnue. */
+export function gearboxOf(listing) {
+  const g = normalize(listing.gearbox ?? '');
+  if (/auto|robot|sequentiel/.test(g)) return 'auto';
+  if (/manuel/.test(g)) return 'manuelle';
+  const t = textOf(listing);
+  if (/\bedc\b|\bdsg\b|\bbva\b|\beat ?\d?\b|\bcvt\b|s.?tronic|\bdct\b|\bbvr\b|automatique|\b7g\b|\b9g\b|steptronic/.test(t)) return 'auto';
+  if (/\bbvm\d?\b|manuelle/.test(t)) return 'manuelle';
+  return null;
+}
+
+/** Puissance DIN (ch) : attribut, sinon lue dans la motorisation ("TCe 90", "120 ch"). null si inconnue. */
+export function powerOf(listing) {
+  if (Number(listing.powerDin) > 30) return Number(listing.powerDin);
+  const t = textOf(listing);
+  const ch = t.match(/\b(\d{2,3}) ?(ch|chevaux|hp|ps)\b/);
+  if (ch) return Number(ch[1]);
+  const code = t.match(/\b(?:tce|dci|blue ?dci|tsi|tdi|hdi|bluehdi|puretech|vti|thp|sce|tfsi|crdi|ecoboost|multijet|tdci|mpi|fsi|d4d|cdi)\s?(\d{2,3})\b/);
+  return code && Number(code[1]) >= 50 ? Number(code[1]) : null;
+}
+
+/** Annonce à écarter des comparables : accidentée, en panne, papiers douteux… (prix tiré vers le bas). */
+export function isDamaged(listing) {
+  const t = normalize(`${listing.title ?? ''} ${listing.description ?? ''}`);
+  return PRICE_SIGNALS.risks.some((r) => findPattern(t, r.pattern));
+}
+
 function quantile(sorted, q) {
   const pos = (sorted.length - 1) * q;
   const lo = Math.floor(pos);
@@ -72,14 +113,37 @@ function quantile(sorted, q) {
  */
 export function estimateMarketPrice(listing, pool, minComparables = MARKET_RULES.minComparables) {
   const key = modelKey(listing);
+  const fuel = fuelOf(listing);
+  const gearbox = gearboxOf(listing);
+  const power = powerOf(listing);
   const sameModel = pool.filter((p) => p.id !== listing.id && p.price > 0 && modelKey(p) === key);
+  // État : les annonces accidentées / en panne tirent la médiane vers le bas, on les écarte.
+  const healthy = sameModel.filter((p) => !isDamaged(p));
+  const damagedExcluded = sameModel.length - healthy.length;
 
   for (const w of MARKET_RULES.windows) {
     const tolerance = Math.max(w.mileageFloor, listing.mileage * w.mileageRatio);
-    const comps = sameModel.filter(
-      (p) => Math.abs(p.year - listing.year) <= w.years && (!listing.mileage || !p.mileage || Math.abs(p.mileage - listing.mileage) <= tolerance),
-    );
+    const comps = healthy.filter((p) => {
+      if (Math.abs(p.year - listing.year) > w.years) return false;
+      if (listing.mileage && p.mileage && Math.abs(p.mileage - listing.mileage) > tolerance) return false;
+      // Motorisation : même carburant, même boîte, puissance proche (quand l'info existe des deux côtés).
+      const pf = fuelOf(p);
+      if (fuel && pf && pf !== fuel) return false;
+      const pg = gearboxOf(p);
+      if (gearbox && pg && pg !== gearbox) return false;
+      const pp = powerOf(p);
+      if (power && pp && Math.abs(pp - power) > power * w.powerRate) return false;
+      return true;
+    });
     if (comps.length < minComparables) continue;
+    const criteria = [
+      fuel ? `même carburant (${fuel})` : 'carburant non vérifié',
+      gearbox ? `même boîte (${gearbox})` : 'boîte non vérifiée',
+      power ? `puissance ±${Math.round(w.powerRate * 100)} % (${power} ch)` : 'puissance non vérifiée',
+      `année ±${w.years}`,
+      listing.mileage ? `km ±${Math.round(tolerance / 1000)} 000` : 'km non vérifié',
+      ...(damagedExcluded > 0 ? [`${damagedExcluded} annonce(s) accidentée(s) / en panne écartée(s)`] : []),
+    ];
 
     let prices = comps.map((p) => p.price).sort((a, b) => a - b);
     if (prices.length >= MARKET_RULES.trimFrom) {
@@ -98,6 +162,7 @@ export function estimateMarketPrice(listing, pool, minComparables = MARKET_RULES
       price: round(quantile(prices, 0.5)),
       comparables: comps.length,
       window: w.label,
+      criteria,
       low: round(quantile(prices, 0.25)),
       high: round(quantile(prices, 0.75)),
     };

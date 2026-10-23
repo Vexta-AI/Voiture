@@ -391,3 +391,38 @@ describe('Revente chez toi', () => {
     assert.ok(low.warnings.some((w) => w.includes('Chez toi')));
   });
 });
+
+describe('Comparables fiables', () => {
+  it('lit carburant, boîte et puissance dans la motorisation', async () => {
+    const { fuelOf, gearboxOf, powerOf } = await import('./market.js');
+    assert.equal(fuelOf({ title: 'Clio 4 1.5 dCi 90' }), 'diesel');
+    assert.equal(fuelOf({ title: 'Clio 4 0.9 TCe 90' }), 'essence');
+    assert.equal(fuelOf({ title: 'Clio 5 E-Tech 140' }), 'hybride');
+    assert.equal(gearboxOf({ title: 'Captur 1.3 TCe 130 EDC' }), 'auto');
+    assert.equal(gearboxOf({ gearbox: 'Manuelle' }), 'manuelle');
+    assert.equal(powerOf({ title: 'Golf 7 2.0 TDI 150' }), 150);
+    assert.equal(powerOf({ title: 'Polo 95 ch' }), 95);
+    assert.equal(powerOf({ title: 'Polo' }), null);
+  });
+
+  it('ne compare pas diesel / essence, auto / manuelle, ni les annonces accidentées', async () => {
+    const { estimateMarketPrice } = await import('./market.js');
+    const mk = (id, price, title, extra = {}) => ({ id: String(id), type: 'auto', brand: 'Renault', model: 'Clio 4', title, year: 2017, mileage: 80000, price, publishedAt: NOW.toISOString(), ...extra });
+    const target = mk(0, 6000, 'Renault Clio 4 1.5 dCi 90', { gearbox: 'Manuelle' });
+    const pool = [
+      mk(1, 9000, 'Renault Clio 4 1.5 dCi 90'),
+      mk(2, 9100, 'Renault Clio 4 1.5 dCi 90'),
+      mk(3, 9200, 'Renault Clio 4 1.5 dCi 90'),
+      mk(4, 9300, 'Renault Clio 4 1.5 dCi 90'),
+      mk(5, 6500, 'Renault Clio 4 0.9 TCe 90'), // essence
+      mk(6, 6600, 'Renault Clio 4 0.9 TCe 90'),
+      mk(7, 12000, 'Renault Clio 4 1.5 dCi 90 EDC'), // auto
+      mk(8, 4000, 'Renault Clio 4 1.5 dCi 90', { description: 'Accidentée à l’avant, roule.' }),
+    ];
+    const m = estimateMarketPrice(target, pool);
+    assert.equal(m?.comparables, 4);
+    assert.equal(m?.price, 9150);
+    assert.ok(m?.criteria.includes('même carburant (diesel)'));
+    assert.ok(m?.criteria.some((c) => c.includes('écartée')));
+  });
+});

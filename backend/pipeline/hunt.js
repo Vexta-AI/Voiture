@@ -32,8 +32,8 @@ export function priceListings(listings, pool, options = {}) {
       listing: {
         ...listing,
         marketPrice: market.price,
-        marketStats: { low: market.low, high: market.high, comparables: market.comparables, daysOnMarket: market.daysOnMarket },
-        ...(local ? { localMarket: { price: local.price, low: local.low, high: local.high, comparables: local.comparables, daysOnMarket: local.daysOnMarket, radiusKm: local.radiusKm } } : {}),
+        marketStats: { low: market.low, high: market.high, comparables: market.comparables, daysOnMarket: market.daysOnMarket, criteria: market.criteria },
+        ...(local ? { localMarket: { price: local.price, low: local.low, high: local.high, comparables: local.comparables, daysOnMarket: local.daysOnMarket, radiusKm: local.radiusKm, criteria: local.criteria } } : {}),
       },
       market,
     });

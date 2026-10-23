@@ -150,6 +150,12 @@ export function ListingCard({
         </div>
       )}
 
+      {listing.marketStats?.criteria && (
+        <p className="border-b border-ink-100 px-4 py-1.5 text-[11px] text-ink-500" title="Critères des annonces comparables utilisées pour le prix marché">
+          Comparé sur : {listing.marketStats.criteria.join(' · ')}
+        </p>
+      )}
+
       {(analysis.market || analysis.quality.owners !== null) && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-ink-100 px-4 py-2 text-xs text-ink-600">
           {analysis.market && 'low' in analysis.market && (
