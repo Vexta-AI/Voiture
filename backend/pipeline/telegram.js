@@ -5,7 +5,8 @@
  */
 
 import { PHOTO_CHECKLIST, inspectionLine } from '../utils/inspection.js';
-import { adUrl } from '../utils/links.js';
+import { generateQualificationMessage } from '../utils/messages.js';
+import { adUrl, priceCheckLinks } from '../utils/links.js';
 
 const escape = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const eur = (n) => `${Math.round(n).toLocaleString('fr-FR')} €`;
@@ -62,6 +63,33 @@ export function formatTelegramAlert(payload, context = {}) {
   const escaped = escape(message.body);
   const body = escaped.length > room ? `${escaped.slice(0, room).replace(/&[a-z]*$/, '')}…` : escaped;
   return `${header}\n<pre>${body}</pre>`;
+}
+
+/**
+ * Alerte « à vérifier » : pépite sur le papier, cote peu fiable. Pas d'offre chiffrée : on vérifie d'abord.
+ * @param {import('../utils/scoring.js').Listing} listing
+ * @param {ReturnType<import('../utils/scoring.js').scoreListing>} analysis
+ */
+export function formatVerifyAlert(listing, analysis) {
+  const conf = listing.marketStats?.confidence;
+  const links = priceCheckLinks(listing);
+  const url = adUrl(listing);
+  const lines = [
+    `🔎 <b>PÉPITE À VÉRIFIER</b> · cote peu fiable${conf ? ` (${conf.score}/100)` : ''}`,
+    `<b>${escape(listing.title)}</b>`,
+    `${listing.year} · ${listing.mileage.toLocaleString('fr-FR')} km · ${escape(listing.location ?? '')}`,
+    `Prix ${eur(listing.price)} · marché estimé ${eur(listing.marketPrice)} (${listing.marketStats?.comparables ?? '?'} annonces seulement) → marge estimée ${eur(analysis.finance.realNetMargin)}`,
+    '<i>Avant toute offre, vérifie la cote :</i>',
+    `• <a href="${escape(links.argus)}">Cote L'argus</a> (version exacte, année, km)`,
+    `• <a href="${escape(links.leboncoin)}">Annonces comparables LeBonCoin</a> (même modèle, année ±1, km ±30 %)`,
+    `👀 <i>Photos :</i> ${PHOTO_CHECKLIST.map((c) => escape(c.split(' : ')[0].toLowerCase())).join(', ')}`,
+  ];
+  if (url) lines.push(`<a href="${escape(url)}">👉 Ouvrir l'annonce</a>`);
+  lines.push('', '<b>Premier message (questions avant visite) :</b>');
+  const header = lines.join('\n');
+  const body = escape(generateQualificationMessage(listing, analysis).text);
+  const room = MAX_LENGTH - header.length - 20;
+  return `${header}\n<pre>${body.length > room ? `${body.slice(0, room).replace(/&[a-z]*$/, '')}…` : body}</pre>`;
 }
 
 /**

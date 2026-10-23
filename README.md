@@ -197,6 +197,15 @@ Chaque deal mené dans le CRM mesure la réalité, à comparer aux hypothèses d
 
 À partir de 3 deals, une mesure devient une **proposition de réglage**, jamais appliquée sans ton accord (`backend/utils/learning.js`). Ces chiffres n'existent que dans ton CRM : c'est l'avantage que personne ne peut copier.
 
+## Pépites à vérifier (cote peu fiable)
+
+Une pépite dont la cote est **faible** (peu de comparables, prix dispersés) ne reçoit jamais d'offre automatique. Elle déclenche une alerte Telegram **🔎 PÉPITE À VÉRIFIER** (3 par run au maximum, choix métier) et une fiche CRM. Chacune contient :
+- les liens pour vérifier le prix soi-même : [cote L'argus](https://www.largus.fr/cote-auto.html) (site commercial, gratuit) et annonces LeBonCoin comparables (année ±1, km ±30 %, les moins chères d'abord) ;
+- la check-list photos ;
+- un **premier message de questions** prêt à copier : lien HistoVec ([officiel, gratuit](https://histovec.interieur.gouv.fr)), propriétaires, factures, distribution, contrôle technique, frais connus, raison de la vente. Les points que l'annonce mentionne déjà sont sautés.
+
+La même aide apparaît sur la carte du site. Une fois la cote vérifiée, saisis-la sur la carte : la marge et le message d'offre sont recalculés. `POST /api/hunt/verify` (secret du cron) envoie les alertes « à vérifier » des annonces déjà relevées, sans lancer de recherche Apify.
+
 ## Photos : check-list et inspection IA
 
 Chaque pépite affiche une **check-list gratuite** de ce qu'il faut regarder sur les photos avant de se déplacer : compteur, voyants, teinte des éléments, pneus, usure de l'intérieur, vraies photos du véhicule. Elle figure aussi dans l'alerte Telegram.

@@ -32,7 +32,7 @@ const round50 = (n, dir = 'down') => (dir === 'up' ? Math.ceil(n / 50) * 50 : Ma
  * @property {{ listingId: string, type: 'auto'|'moto', title: string, year: number, mileage: number, location?: string|null, url?: string|null, zone?: string|null, distanceKm?: number|null, areaType?: string|null, photo?: string|null, masterclass?: boolean, reasons?: string[], strengths?: string[], owners?: number|null, inspection?: { verdict: string, summary: string, questions: string[] }|null }} vehicle
  * @property {{ name?: string, phone?: string, channel?: string }} contact
  * @property {Record<string, number|null|undefined>} numbers
- * @property {{ subject: string, body: string } | null} firstMessage
+ * @property {{ subject: string, body: string, kind?: 'offre'|'questions'|'mandat' } | null} firstMessage
  * @property {Record<string, boolean>} docs
  * @property {string|null} [rdvAt]
  * @property {string|null} [lostReason]
@@ -55,7 +55,7 @@ export const partyOf = (deal) => PIPELINES[deal.kind].party;
 
 /**
  * Deal achat ou mandat depuis une annonce scorée (radar ou ajout manuel).
- * @param {{ kind: 'achat'|'mandat', listing: import('./scoring.js').Listing, analysis: ReturnType<import('./scoring.js').scoreListing>, message?: { subject: string, body: string } | null, offerPrice?: number, source?: 'radar'|'manuel', now?: Date }} params
+ * @param {{ kind: 'achat'|'mandat', listing: import('./scoring.js').Listing, analysis: ReturnType<import('./scoring.js').scoreListing>, message?: { subject: string, body: string, kind?: 'offre'|'questions'|'mandat' } | null, offerPrice?: number, source?: 'radar'|'manuel', now?: Date }} params
  * @returns {Deal}
  */
 export function createDeal({ kind, listing, analysis, message = null, offerPrice, source = 'manuel', now = new Date() }) {
@@ -455,7 +455,8 @@ export function nextAction(deal, now = new Date()) {
     if (!lastMsg) {
       const message = deal.firstMessage?.body ?? (deal.kind === 'revente' ? undefined : followUpMessage(deal, 1));
       // L'offre part avec le message : l'apprentissage mesure ensuite quelle remise fonctionne.
-      const offer = deal.kind === 'achat' ? Number(deal.numbers.offerPrice) || undefined : undefined;
+      // Premier message de questions (cote à vérifier) : aucune offre n'est encore faite.
+      const offer = deal.kind === 'achat' && deal.firstMessage?.kind !== 'questions' ? Number(deal.numbers.offerPrice) || undefined : undefined;
       return { kind: 'contacter', label: deal.kind === 'revente' ? "Contacter l'acheteur" : 'Envoyer le premier message', dueAt: deal.createdAt, overdue: false, priority: 50 + Number(deal.numbers.score ?? 0) / 2, message, offer };
     }
     if (deal.stage === 'rdv') {
