@@ -20,6 +20,10 @@ export interface Listing {
   description?: string;
   options?: string[];
   doors?: number;
+  /** Marché actuel : fourchette des comparables (25-75 %), nombre, jours en ligne médians */
+  marketStats?: { low: number; high: number; comparables: number; daysOnMarket: number | null };
+  /** Cote Argus saisie à la main (pas d'accès gratuit à l'Argus officiel) */
+  argusPrice?: number;
   /** Photos de l'annonce (URL) */
   photos?: string[];
   /** Puissance fiscale (CV) : base de la carte grise */

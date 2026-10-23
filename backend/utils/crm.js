@@ -29,7 +29,7 @@ const round50 = (n, dir = 'down') => (dir === 'up' ? Math.ceil(n / 50) * 50 : Ma
  * @property {'radar'|'manuel'} source
  * @property {string} createdAt
  * @property {string} updatedAt
- * @property {{ listingId: string, type: 'auto'|'moto', title: string, year: number, mileage: number, location?: string|null, url?: string|null, zone?: string|null, distanceKm?: number|null, areaType?: string|null, photo?: string|null, masterclass?: boolean, reasons?: string[] }} vehicle
+ * @property {{ listingId: string, type: 'auto'|'moto', title: string, year: number, mileage: number, location?: string|null, url?: string|null, zone?: string|null, distanceKm?: number|null, areaType?: string|null, photo?: string|null, masterclass?: boolean, reasons?: string[], strengths?: string[], owners?: number|null }} vehicle
  * @property {{ name?: string, phone?: string, channel?: string }} contact
  * @property {Record<string, number|null|undefined>} numbers
  * @property {{ subject: string, body: string } | null} firstMessage
@@ -79,6 +79,10 @@ export function createDeal({ kind, listing, analysis, message = null, offerPrice
           maxBuyPrice: f.maxBuyPriceForPepite,
           walkAwayPrice: f.walkAwayPrice,
           realNetMargin: f.realNetMargin,
+          marketLow: listing.marketStats?.low ?? null,
+          marketHigh: listing.marketStats?.high ?? null,
+          daysOnMarket: listing.marketStats?.daysOnMarket ?? null,
+          argusPrice: listing.argusPrice ?? null,
           registrationCost: f.registrationCost,
           transportCost: f.transportCost,
           reconditioning: COSTS.RECONDITIONING_BASE,
@@ -102,6 +106,8 @@ export function createDeal({ kind, listing, analysis, message = null, offerPrice
       photo: listing.photos?.[0] ?? null,
       masterclass: Boolean(analysis.masterclass),
       reasons: analysis.priceReasons?.reasons ?? [],
+      strengths: analysis.quality?.hits.map((q) => q.label) ?? [],
+      owners: analysis.quality?.owners ?? null,
       zone: analysis.zone ?? null,
       distanceKm: analysis.distanceKm ?? null,
       areaType: analysis.areaType ?? null,
@@ -511,7 +517,7 @@ export const isActionable = (action) => action.kind !== 'attendre' && action.kin
 // Actions (réducteur immuable)
 // ---------------------------------------------------------------------------
 
-const EDITABLE = new Set(['offerPrice', 'maxBuyPrice', 'walkAwayPrice', 'ownerNet', 'salePrice', 'purchasePrice', 'listedPrice', 'floorPrice', 'soldPrice', 'extraCosts', 'registrationCost', 'transportCost', 'reconditioning']);
+const EDITABLE = new Set(['argusPrice', 'offerPrice', 'maxBuyPrice', 'walkAwayPrice', 'ownerNet', 'salePrice', 'purchasePrice', 'listedPrice', 'floorPrice', 'soldPrice', 'extraCosts', 'registrationCost', 'transportCost', 'reconditioning']);
 
 /**
  * @typedef {{ type: 'outbound', text: string, offer?: number }

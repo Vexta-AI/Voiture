@@ -368,3 +368,24 @@ describe('Pourquoi ce prix ? / MASTERCLASS', () => {
     assert.ok(a.priceReasons.reasons.some((r) => r.includes('demander au vendeur')));
   });
 });
+
+describe('Points forts & marché', () => {
+  it('factures, première main, distribution faite', () => {
+    const a = score({ description: 'Première main, toutes les factures, courroie de distribution changée en 2025, non fumeur.' });
+    assert.equal(a.quality.owners, 1);
+    const ids = a.quality.hits.map((q) => q.id);
+    for (const id of ['owners', 'factures', 'distribution', 'non-fumeur']) assert.ok(ids.includes(id), id);
+    assert.ok(a.score > score({ description: 'Bon état.' }).score);
+  });
+
+  it('beaucoup de propriétaires = avertissement', () => {
+    assert.ok(score({ description: '4 propriétaires.' }).warnings.some((w) => w.includes('propriétaires')));
+  });
+
+  it('marché lent et cote Argus en aide à la décision', () => {
+    const a = score({ marketStats: { low: 6500, high: 7400, comparables: 9, daysOnMarket: 60 }, argusPrice: 7600 });
+    assert.ok(a.insights.some((i) => i.includes('Marché lent')));
+    assert.ok(a.insights.some((i) => i.includes('Cote Argus')));
+    assert.equal(a.market?.argus, 7600);
+  });
+});

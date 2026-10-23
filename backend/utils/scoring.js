@@ -31,6 +31,7 @@ import {
   MASTERCLASS,
   PRICE_BANDS,
   PRICE_SIGNALS,
+  QUALITY_SIGNALS,
   REGISTRATION,
   RURAL,
   SEASONALITY,
@@ -60,6 +61,8 @@ import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplaceme
  * @property {string} [description]
  * @property {string[]} [options]
  * @property {number} [doors]
+ * @property {{ low: number, high: number, comparables: number, daysOnMarket: number|null }} [marketStats] marché actuel (comparables)
+ * @property {number} [argusPrice]    cote Argus saisie à la main
  * @property {string[]} [photos]    photos de l'annonce
  * @property {number} [fiscalHp]       puissance fiscale (CV), base de la carte grise
  * @property {string} [vin]
@@ -388,6 +391,31 @@ export function priceReasons(listing, text, online, now = new Date()) {
   return { gapRate, motivated, risks, reasons };
 }
 
+/** Nombre de propriétaires annoncé ("première main", "2 propriétaires") ; null si non dit. */
+export function ownersCount(text) {
+  const words = { premiere: 1, '1ere': 1, '1re': 1, '1er': 1, deuxieme: 2, seconde: 2, '2eme': 2, '2e': 2, troisieme: 3, '3eme': 3, '3e': 3, un: 1, une: 1, deux: 2, trois: 3, quatre: 4 };
+  const main = text.match(/\b(premiere|1ere|1re|deuxieme|seconde|2eme|2e|troisieme|3eme|3e) main\b/);
+  if (main) return words[main[1]];
+  const owners = text.match(/\b(\d|un|une|deux|trois|quatre|1er) (seul )?(proprietaires?|proprio)\b/);
+  if (owners) return words[owners[1]] ?? Number(owners[1]);
+  if (/\bunique proprietaire|seul proprietaire\b/.test(text)) return 1;
+  return null;
+}
+
+/**
+ * Points forts : factures, carnet, révision, distribution, propriétaires…
+ * @returns {{ owners: number|null, hits: { id: string, label: string, evidence: string }[], points: number }}
+ */
+export function qualitySignals(text) {
+  const hits = QUALITY_SIGNALS.items.flatMap((q) => {
+    const evidence = findPattern(text, q.pattern);
+    return evidence ? [{ id: q.id, label: q.label, evidence }] : [];
+  });
+  const owners = ownersCount(text);
+  if (owners !== null && owners <= 2) hits.unshift({ id: 'owners', label: owners === 1 ? '1ère main' : '2 propriétaires', evidence: '' });
+  return { owners, hits, points: Math.min(QUALITY_SIGNALS.maxPoints, hits.length * QUALITY_SIGNALS.pointsEach) };
+}
+
 /**
  * Campagne ou ville : distance à la grande ville la plus proche (GPS requis).
  * @returns {{ type: 'campagne'|'ville'|null, nearestCity: string|null, cityKm: number|null }}
@@ -519,6 +547,20 @@ export function scoreListing(listing, options = {}) {
 
   // --- Pourquoi ce prix ? & MASTERCLASS ---
   const why = priceReasons(listing, text, online, now);
+  const quality = qualitySignals(text);
+  if (quality.owners !== null && quality.owners >= 4) warnings.push(`${quality.owners} propriétaires : historique chargé, décote à la revente.`);
+  const stats = listing.marketStats;
+  if (stats?.daysOnMarket !== null && stats?.daysOnMarket !== undefined) {
+    insights.push(
+      stats.daysOnMarket >= 45
+        ? `Marché lent : les ${stats.comparables} annonces similaires sont en ligne depuis ${stats.daysOnMarket} jours (médiane). Prévoir du temps pour revendre.`
+        : `Marché actif : les annonces similaires sont en ligne depuis ${stats.daysOnMarket} jours (médiane).`,
+    );
+  }
+  if (listing.argusPrice) {
+    const gap = Math.round(((listing.argusPrice - marketPrice) / listing.argusPrice) * 100);
+    insights.push(`Cote Argus ${listing.argusPrice.toLocaleString('fr-FR')} € : le marché actuel est ${gap >= 0 ? `${gap} % en dessous` : `${-gap} % au-dessus`}.`);
+  }
   const masterclass =
     status.key === 'PEPITE' &&
     realNetMargin >= threshold * MASTERCLASS.marginMultiplier &&
@@ -535,12 +577,13 @@ export function scoreListing(listing, options = {}) {
     const leverPts = clamp(leversTotal / 100, 0, 10);
     const agePts = online >= MANDATE.minDaysOnline ? 5 : 0;
     const ruralPts = area.type === 'campagne' ? RURAL.scoreBonus : 0;
+    const qualityPts = quality.points;
     const liquidityPts = listing.type === 'auto' && segment === 'citadine' && (listing.doors ?? 5) >= 5 ? 5 : listing.type === 'moto' && triggers.some((t) => t.id === MOTO_A2.id) ? 5 : 0;
     // Le rapatriement est déjà déduit de la marge : son avertissement ne pénalise pas deux fois.
     let penalties = (warnings.length - (geo.zone === 'france' ? 1 : 0)) * 5;
     if (puretechOverpriced) penalties += 15;
     if (!inBudget) penalties += 10;
-    score = Math.round(clamp(marginPts + triggerPts + leverPts + agePts + ruralPts + liquidityPts - penalties, 0, 100));
+    score = Math.round(clamp(marginPts + triggerPts + leverPts + agePts + ruralPts + qualityPts + liquidityPts - penalties, 0, 100));
     if (status.key === 'REFUSE') score = Math.min(score, 20);
     if (masterclass) score = Math.min(100, score + MASTERCLASS.scoreBonus);
   }
@@ -553,6 +596,8 @@ export function scoreListing(listing, options = {}) {
     status,
     masterclass,
     priceReasons: why,
+    quality,
+    market: stats ? { ...stats, argus: listing.argusPrice ?? null } : listing.argusPrice ? { argus: listing.argusPrice } : null,
     score,
     segment,
     segmentLabel: segmentRule.label,

@@ -310,6 +310,26 @@ export const PRICE_SIGNALS = {
   bigGapRate: 0.15,
 };
 
+/**
+ * Points forts de l'annonce (historique, propriétaires, entretien) : arguments de revente
+ * et confiance dans le véhicule. +2 points de score chacun, 6 max.
+ */
+export const QUALITY_SIGNALS = {
+  items: [
+    { id: 'factures', label: 'Toutes les factures', pattern: /(toutes? les|ensemble des|avec (les|ses)) factures|factures (d'?entretien|a l'?appui|disponibles|fournies|completes?)|dossier complet/ },
+    { id: 'carnet', label: "Carnet d'entretien à jour", pattern: /carnet (d'?entretien )?(complet|a jour|tamponne|constructeur|concession)|historique (complet|d'?entretien)|suivie? (en )?(concession|constructeur|reseau)|entretien (concession|constructeur|reseau)/ },
+    { id: 'revision', label: 'Révision récente', pattern: /revision (recente|faite|ok|effectuee)|vidange (recente|faite)|entretien (recent|fait|a jour)/ },
+    { id: 'distribution', label: 'Distribution faite', pattern: /(courroie|kit|distribution).{0,25}(faite?|changee?|remplacee?|neuve)/ },
+    { id: 'pneus', label: 'Pneus récents', pattern: /pneus? (neufs?|recents?|changes?)|4 pneus/ },
+    { id: 'ct-ok', label: 'CT OK', pattern: /(ct|controle technique) (ok|vierge|valide|r ?a ?s|sans defaut|recent|de moins de)/ },
+    { id: 'non-fumeur', label: 'Non-fumeur', pattern: /non[ -]fumeur/ },
+    { id: 'garage', label: 'Dort au garage', pattern: /dort (au|en) garage|garee? (au|en) garage|stationne en garage/ },
+    { id: 'garantie', label: 'Encore sous garantie', pattern: /(encore|toujours) sous garantie|garantie constructeur (jusqu|valable)/ },
+  ],
+  pointsEach: 2,
+  maxPoints: 6,
+};
+
 /** 💎 MASTERCLASS : pépite à marge réelle >= 2 x le seuil, sans aucun signal de risque, prix crédible (>= 60 % de la cote). */
 export const MASTERCLASS = { marginMultiplier: 2, minPriceRate: 0.6, scoreBonus: 10 };
 

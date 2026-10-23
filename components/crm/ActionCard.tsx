@@ -31,6 +31,7 @@ export function DealNumbers({ deal }: { deal: Deal }) {
             ['Ton offre', n.offerPrice],
             ['Max pépite', n.maxBuyPrice, 'Au-dessus, la marge passe sous le seuil PÉPITE'],
             ['Plafond', n.walkAwayPrice, 'Ne jamais dépasser : marge réelle à 0'],
+            ['Argus', n.argusPrice],
           ]
       : deal.kind === 'mandat'
         ? [
@@ -55,6 +56,8 @@ export function DealNumbers({ deal }: { deal: Deal }) {
     </dl>
   );
 }
+
+const n = (deal: Deal) => deal.numbers;
 
 export function ActionCard({ deal, action, heat, onAct, onOpen }: { deal: Deal; action: Action; heat: Heat; onAct: (id: string, action: DealActionBody) => Promise<boolean>; onOpen: () => void }) {
   const [message, setMessage] = useState(action.message ?? '');
@@ -113,6 +116,15 @@ export function ActionCard({ deal, action, heat, onAct, onOpen }: { deal: Deal; 
       </div>
 
       <DealNumbers deal={deal} />
+
+      {(n(deal).marketLow || deal.vehicle.owners || deal.vehicle.strengths?.length) ? (
+        <p className="text-xs text-ink-600">
+          {n(deal).marketLow ? `Marché ${eur(Number(n(deal).marketLow))} – ${eur(Number(n(deal).marketHigh))}` : ''}
+          {n(deal).daysOnMarket ? ` · vente ≈ ${n(deal).daysOnMarket} j` : ''}
+          {deal.vehicle.owners ? ` · ${deal.vehicle.owners} propriétaire(s)` : ''}
+          {deal.vehicle.strengths?.length ? ` · ✓ ${deal.vehicle.strengths.join(', ')}` : ''}
+        </p>
+      ) : null}
 
       {deal.vehicle.reasons && deal.vehicle.reasons.length > 0 && (
         <ul className="space-y-0.5 rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-600">

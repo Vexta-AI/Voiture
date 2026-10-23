@@ -37,6 +37,7 @@ export function DealDrawer(props: Props) {
 /** Champs chiffrés modifiables selon le pipeline. */
 const NUMBER_FIELDS = {
   achat: [
+    ['argusPrice', 'Cote Argus (saisie)'],
     ['offerPrice', 'Ton offre'],
     ['maxBuyPrice', 'Prix max pépite'],
     ['walkAwayPrice', 'Prix plafond'],

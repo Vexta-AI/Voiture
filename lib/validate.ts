@@ -56,6 +56,17 @@ export function validateListing(input: unknown): Result {
       options: Array.isArray(o.options) ? o.options.filter((x): x is string => typeof x === 'string') : undefined,
       doors: num(o.doors),
       fiscalHp: num(o.fiscalHp),
+      argusPrice: num(o.argusPrice),
+      marketStats:
+        o.marketStats && typeof o.marketStats === 'object'
+          ? (() => {
+              const m = o.marketStats as Record<string, unknown>;
+              const low = num(m.low);
+              const high = num(m.high);
+              const comparables = num(m.comparables);
+              return low && high && comparables ? { low, high, comparables, daysOnMarket: num(m.daysOnMarket) ?? null } : undefined;
+            })()
+          : undefined,
       photos: Array.isArray(o.photos) ? o.photos.filter((x): x is string => typeof x === 'string' && /^https?:\/\//.test(x)).slice(0, 8) : undefined,
       vin: str(o.vin),
       licenseCategory: license === 'MTT1' || license === 'MTT2' ? license : undefined,

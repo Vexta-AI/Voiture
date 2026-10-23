@@ -136,6 +136,31 @@ export function ListingCard({
         </div>
       </dl>
 
+      {(analysis.market || analysis.quality.owners !== null) && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-ink-100 px-4 py-2 text-xs text-ink-600">
+          {analysis.market && 'low' in analysis.market && (
+            <span title="Fourchette des annonces comparables en ligne (25 % - 75 %)">
+              Marché actuel <strong className="tabular text-ink-900">{eur(analysis.market.low)} – {eur(analysis.market.high)}</strong> ({analysis.market.comparables} annonces)
+            </span>
+          )}
+          {analysis.market && 'daysOnMarket' in analysis.market && analysis.market.daysOnMarket !== null && (
+            <span className={cn(analysis.market.daysOnMarket >= 45 && 'text-amber-700 dark:text-amber-300')} title="Depuis combien de jours les annonces similaires sont en ligne (médiane)">
+              Délai de vente ≈ <strong className="tabular">{analysis.market.daysOnMarket} j</strong>
+            </span>
+          )}
+          {analysis.market?.argus ? (
+            <span>
+              Argus <strong className="tabular text-ink-900">{eur(analysis.market.argus)}</strong>
+            </span>
+          ) : null}
+          {analysis.quality.owners !== null && (
+            <span>
+              Propriétaires <strong className="tabular text-ink-900">{analysis.quality.owners}</strong>
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-1 flex-col gap-2.5 p-4">
         {analysis.blacklist.map((b) => (
           <div key={b.id} className="rounded-lg border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3 py-2 text-xs text-rose-800 dark:text-rose-300">
@@ -153,6 +178,16 @@ export function ListingCard({
                 <li key={r}>• {r}</li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {analysis.quality.hits.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {analysis.quality.hits.map((q) => (
+              <Chip key={q.id} tone="green" title={q.evidence || undefined}>
+                ✓ {q.label}
+              </Chip>
+            ))}
           </div>
         )}
 
