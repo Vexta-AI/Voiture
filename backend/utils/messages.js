@@ -181,3 +181,38 @@ export function generateMandateMessage(listing, analysis, options = {}) {
     commission: mandate?.commission ?? Math.max(0, salePrice - ownerNet),
   };
 }
+
+/**
+ * Premier message quand la cote est peu fiable (ou avant toute offre) : on qualifie la voiture avant de
+ * parler prix. Les questions déjà réglées par l'annonce (factures, distribution, CT, propriétaires) sont sautées.
+ * @param {import('./scoring.js').Listing} listing
+ * @param {ReturnType<import('./scoring.js').scoreListing>} analysis
+ * @param {{ signature?: string }} [options]
+ */
+export function generateQualificationMessage(listing, analysis, options = {}) {
+  const name = vehicleName(listing);
+  const known = new Set(analysis.quality?.hits.map((h) => h.id) ?? []);
+  const questions = [
+    // HistoVec : rapport officiel et gratuit (propriétaires, sinistres, gage, km relevés aux CT).
+    'Pourriez-vous m’envoyer le lien du rapport HistoVec ? (gratuit sur histovec.interieur.gouv.fr, 2 minutes avec la carte grise)',
+    analysis.quality?.owners === null || analysis.quality?.owners === undefined ? 'Combien de propriétaires a-t-elle eus ?' : null,
+    known.has('factures') || known.has('carnet') ? 'Les factures d’entretien sont-elles disponibles pour la visite ?' : 'Avez-vous les factures d’entretien ?',
+    known.has('distribution') ? null : 'La distribution a-t-elle déjà été faite ? Si oui, à quel kilométrage ?',
+    known.has('ct-ok') ? 'Le contrôle technique a-t-il relevé des défauts mineurs ?' : 'De quand date le dernier contrôle technique, et avec quelles remarques ?',
+    'Y a-t-il des frais à prévoir que vous connaissez ?',
+    'Pour quelle raison la vendez-vous ?',
+  ].filter(Boolean);
+
+  const lines = [
+    'Bonjour,',
+    '',
+    `Votre ${name} de ${listing.year} (${Number(listing.mileage).toLocaleString('fr-FR')} km) m’intéresse sérieusement. Avant de me déplacer, quelques questions :`,
+    '',
+    ...questions.map((q) => `• ${q}`),
+    '',
+    'Si tout est clair, je peux venir la voir rapidement, avec paiement immédiat par virement instantané.',
+    '',
+    options.signature ?? 'Merci d’avance, bonne journée',
+  ];
+  return { subject: `${name} : quelques questions avant visite`, text: lines.join('\n'), questions };
+}

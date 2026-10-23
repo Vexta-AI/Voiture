@@ -4,11 +4,11 @@ import { randomUUID } from 'node:crypto';
 
 import { getDatasetItems, getRun, isCapacityError, startRun } from '@/backend/pipeline/apify.js';
 import { priceHistory, repostIndex, withPriceDrop, withRepost } from '@/backend/pipeline/history.js';
-import { ondemandCandidates, priceListings, selectAlerts } from '@/backend/pipeline/hunt.js';
+import { ondemandCandidates, priceListings, selectAlerts, selectVerifyAlerts } from '@/backend/pipeline/hunt.js';
 import { filterArea } from '@/backend/pipeline/geo.js';
 import { dedupeById } from '@/backend/pipeline/market.js';
 import { normalizeApifyItem } from '@/backend/pipeline/normalize.js';
-import { formatTelegramAlert, sendTelegram } from '@/backend/pipeline/telegram.js';
+import { formatTelegramAlert, formatVerifyAlert, sendTelegram } from '@/backend/pipeline/telegram.js';
 import { INSPECTION } from '@/backend/utils/inspection.js';
 import { dailyDigest } from '@/backend/utils/crm.js';
 import { matchBuyers } from '@/backend/utils/matching.js';
@@ -214,6 +214,46 @@ async function alertOn(config: Config, priced: ReturnType<typeof priceListings>[
       summary.alertErrors += 1;
     }
   }
+  await sendVerifyAlerts(config, priced, summary);
+}
+
+/** Pépites à cote peu fiable : alerte « à vérifier » (questions au vendeur, liens de cote), et fiche CRM. */
+async function sendVerifyAlerts(config: Config, priced: ReturnType<typeof priceListings>['priced'], summary: { verify?: number; alertErrors: number; crmCreated: number }) {
+  let sent = 0;
+  for (const v of selectVerifyAlerts(priced)) {
+    try {
+      if (await createDealOnce(dealFromListing('achat', v.listing as Listing, 'radar', new Date(), { verify: true }))) summary.crmCreated += 1;
+    } catch (error) {
+      console.error('[hunt] crm verify', error);
+    }
+    if (!config.telegramToken || !config.telegramChatId || (await alertAlreadySent(v.key))) continue;
+    try {
+      await sendTelegram({ token: config.telegramToken, chatId: config.telegramChatId, text: formatVerifyAlert(v.listing, v.analysis) });
+      await markAlertSent(v.key, { listingId: v.listing.id, strategy: 'verify', score: v.analysis.score });
+      sent += 1;
+    } catch (error) {
+      console.error('[hunt] telegram verify', error);
+      summary.alertErrors += 1;
+    }
+  }
+  summary.verify = sent;
+}
+
+/**
+ * Rattrapage : envoie les alertes « à vérifier » sur les annonces déjà relevées (3 derniers jours),
+ * sans lancer de recherche Apify. Les alertes déjà envoyées ne repartent pas.
+ */
+export async function sendPendingVerifyAlerts() {
+  const config = huntConfig();
+  const runs = await loadRuns(HUNT_LIMITS.retentionDays);
+  const pool = dedupeById(runs.flatMap((r) => r.listings));
+  const since = Date.now() - 3 * 86_400_000;
+  const recent = dedupeById(runs.filter((r) => r.kind !== 'market' && new Date(r.fetchedAt).getTime() >= since).flatMap((r) => r.listings));
+  const area = config.area ?? DEFAULT_AREA;
+  const { priced } = priceListings(filterArea(recent, area, { national: true }).kept, pool, { base: area });
+  const summary = { verify: 0, alertErrors: 0, crmCreated: 0 };
+  await sendVerifyAlerts(config, priced, summary);
+  return summary;
 }
 
 /**

@@ -11,6 +11,7 @@ import { cn, eur, km, signedEur } from '@/lib/format';
 import type { ScoredListing } from '@/lib/types';
 
 import { InspectionPanel } from './InspectionPanel';
+import { VerifyPanel } from './VerifyPanel';
 import { MarginBreakdown } from './MarginBreakdown';
 
 export type MessageKind = 'negotiation' | 'mandate';
@@ -284,6 +285,8 @@ export function ListingCard({
             ))}
           </ul>
         )}
+
+        {!refused && listing.marketStats?.confidence?.level === 'faible' && <VerifyPanel listing={listing} analysis={analysis} />}
 
         {!refused && listing.photos && listing.photos.length > 0 && (
           <InspectionPanel

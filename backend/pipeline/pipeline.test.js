@@ -3,12 +3,14 @@ import { describe, it } from 'node:test';
 
 import { DEFAULT_AREA, defaultSources, parseArea, parseTypes } from '../config/sources.js';
 import { getDatasetItems, isCapacityError, startRun } from './apify.js';
-import { alertKey, priceListings, selectAlerts } from './hunt.js';
+import { alertKey, priceListings, selectAlerts, selectVerifyAlerts } from './hunt.js';
 import { distanceKm, filterArea } from './geo.js';
 import { estimateMarketPrice, modelKey, variantOf } from './market.js';
 import { normalizeApifyItem, toInt } from './normalize.js';
 import { scoreListing } from '../utils/scoring.js';
-import { formatTelegramAlert, sendTelegram } from './telegram.js';
+import { formatTelegramAlert, formatVerifyAlert, sendTelegram } from './telegram.js';
+import { generateQualificationMessage } from '../utils/messages.js';
+import { priceCheckLinks } from '../utils/links.js';
 import { BUSINESS } from '../config/rules.js';
 
 // Formule de base testée hors cotisations micro (testées à part).
@@ -496,5 +498,47 @@ describe('Annonces republiées', () => {
     assert.equal(a.priceReasons.motivated[0].id, 'republiee');
     const other = withRepost({ ...fresh, zip: '64000' }, repostIndex(runs));
     assert.equal(other.repost, undefined, 'autre ville : autre voiture');
+  });
+});
+
+describe('Pépites à vérifier (cote peu fiable)', () => {
+  const fresh = listing({ ad_id: 7, price: 6500 });
+  // Prix très dispersés : la médiane existe, mais la cote est classée « faible ».
+  const { priced } = priceListings([fresh], comps([5000, 6500, 9500, 12500, 14000]));
+
+  it('pas d’alerte classique, mais une alerte « à vérifier »', () => {
+    assert.equal(priced[0].market.confidence?.level, 'faible');
+    assert.equal(selectAlerts(priced, { now: NOW }).length, 0);
+    const verify = selectVerifyAlerts(priced, { now: NOW });
+    assert.equal(verify.length, 1);
+    assert.equal(verify[0].key, alertKey(fresh.id, 'verify', 6500));
+  });
+
+  it('alerte Telegram : liens de cote, check-list, message de questions, sans offre', () => {
+    const [v] = selectVerifyAlerts(priced, { now: NOW });
+    const text = formatVerifyAlert(v.listing, v.analysis);
+    assert.match(text, /PÉPITE À VÉRIFIER/);
+    assert.match(text, /largus\.fr/);
+    assert.match(text, /leboncoin\.fr\/recherche\?category=2/);
+    assert.match(text, /HistoVec/);
+    assert.doesNotMatch(text, /offre ferme/i);
+    assert.ok(text.length <= 4096);
+  });
+
+  it('message de questions : saute ce que l’annonce dit déjà', () => {
+    const withDistri = listing({ ad_id: 8, description: 'Distribution faite à 90 000 km, toutes les factures.' });
+    const a = scoreListing(withDistri, { now: NOW });
+    const m = generateQualificationMessage(withDistri, a);
+    assert.doesNotMatch(m.text, /distribution a-t-elle/);
+    assert.match(m.text, /factures d’entretien sont-elles disponibles/);
+    assert.match(m.text, /HistoVec/);
+  });
+
+  it('liens de vérification : modèle nettoyé, année ±1, km ±30 %', () => {
+    const links = priceCheckLinks({ type: 'auto', brand: 'Mini', model: 'Mini_model all', year: 2012, mileage: 100000 });
+    const url = new URL(links.leboncoin);
+    assert.equal(url.searchParams.get('text'), 'mini mini');
+    assert.equal(url.searchParams.get('regdate'), '2011-2013');
+    assert.equal(url.searchParams.get('mileage'), '70000-130000');
   });
 });

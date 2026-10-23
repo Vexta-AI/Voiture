@@ -71,6 +71,27 @@ export function ondemandCandidates(missing, { max, skip = new Set() }) {
 }
 
 /** Clé anti-doublon : une nouvelle alerte part si la stratégie ou le prix change (baisse de prix). */
+/** Alertes « à vérifier » max par run : pépites sur le papier, mais cote peu fiable. Choix métier. */
+export const MAX_VERIFY_PER_RUN = 3;
+
+/**
+ * Pépites dont la cote est peu fiable : pas d'offre (le prix marché n'est pas sûr), mais une alerte
+ * « à vérifier » avec les questions au vendeur et les liens pour contrôler la cote soi-même.
+ * @param {ReturnType<typeof priceListings>['priced']} priced
+ * @param {{ now?: Date, max?: number }} [options]
+ */
+export function selectVerifyAlerts(priced, options = {}) {
+  const now = options.now ?? new Date();
+  return priced
+    .filter(({ market }) => market.confidence?.level === 'faible')
+    .map(({ listing, market }) => ({ listing, market, analysis: scoreListing(listing, { now }) }))
+    // Même garde-fou anti-arnaque que les alertes : jamais sous 50 % de la cote.
+    .filter((c) => c.analysis.status.key === 'PEPITE' && c.analysis.blacklist.length === 0 && c.listing.price >= c.listing.marketPrice * MARKET_RULES.suspiciousRatio)
+    .sort((a, b) => (a.analysis.zone === 'france' ? 1 : 0) - (b.analysis.zone === 'france' ? 1 : 0) || b.analysis.score - a.analysis.score)
+    .slice(0, options.max ?? MAX_VERIFY_PER_RUN)
+    .map((c) => ({ ...c, key: alertKey(c.listing.id, 'verify', c.listing.price) }));
+}
+
 export function alertKey(listingId, strategy, price) {
   return `${listingId}-${strategy}-${price}`.replace(/[^a-zA-Z0-9-]/g, '_');
 }
