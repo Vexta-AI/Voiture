@@ -378,6 +378,43 @@ export const QUALITY_SIGNALS = {
   maxPoints: 6,
 };
 
+/**
+ * VENDABILITÉ : à modèle égal, la finition, les options et la couleur font qu'une voiture part vite ou traîne.
+ * Ces signaux ne changent ni la marge ni le score : ils s'affichent pour décider (CLAUDE.md).
+ *
+ * - Finition : « les modèles d'entrée de gamme seront souvent plus compliqués à revendre à bon prix »,
+ *   « les variantes intermédiaires se retrouvent généralement mieux placées », et le surcoût des plus hautes
+ *   « n'est pas toujours évident à répercuter en occasion » (L'argus, 20/11/2023 :
+ *   https://www.largus.fr/actualite-automobile/quelles-voitures-francaises-a-essence-decotent-le-plus-30030557.html).
+ *   Niveaux de finition par marque : nomenclature des constructeurs (choix métier, à compléter).
+ * - Couleur : noir, gris et blanc se vendent le plus ; rose, jaune, violet ou une voiture personnalisée
+ *   peuvent faire baisser le prix (Capcar, 12/06/2019, site commercial :
+ *   https://www.capcar.fr/blog/la-couleur-a-t-elle-une-influence-sur-la-valeur-de-votre-voiture-doccasion).
+ *   Aucune étude française récente ne chiffre l'effet : pas de montant, seulement un signal.
+ * - Annonce qui traîne : en ligne bien plus longtemps que les comparables = souvent une raison (finition,
+ *   état, prix). Seuil 1,5 x la médiane des comparables : choix métier.
+ */
+export const SELLABILITY = {
+  trims: {
+    volkswagen: { entree: ['trendline', 'start'], milieu: ['confortline', 'comfortline', 'lounge', 'united', 'active', 'life'], haut: ['carat', 'highline', 'style', 'r-line', 'r line', 'gtd', 'gti', 'gte'] },
+    renault: { entree: ['life', 'authentique', 'expression', 'equilibre'], milieu: ['zen', 'business', 'limited', 'evolution', 'techno'], haut: ['intens', 'initiale paris', 'rs line', 'r.s. line', 'iconic', 'esprit alpine'] },
+    peugeot: { entree: ['access', 'like'], milieu: ['active', 'style', 'signature'], haut: ['allure', 'gt line', 'gt', 'feline'] },
+    citroen: { entree: ['live', 'attraction', 'you'], milieu: ['feel', 'plus'], haut: ['shine', 'exclusive', 'max'] },
+    dacia: { entree: ['access', 'essentiel', 'ambiance'], milieu: ['confort', 'expression', 'laureate'], haut: ['prestige', 'journey', 'extreme', 'stepway'] },
+    audi: { entree: [], milieu: ['design', 'business', 'advanced'], haut: ['s line', 's-line', 'sline', 'design luxe', 'competition'] },
+    mercedes: { entree: ['style'], milieu: ['business', 'progressive', 'intuition'], haut: ['amg line', 'fascination', 'sport edition'] },
+    bmw: { entree: ['premiere'], milieu: ['lounge', 'business design', 'business'], haut: ['m sport', 'luxury', 'sport'] },
+    toyota: { entree: ['active', 'dynamic business'], milieu: ['dynamic', 'design'], haut: ['collection', 'gr sport', 'lounge'] },
+    mini: { entree: ['one', 'essential'], milieu: ['cooper', 'classic', 'salt'], haut: ['cooper s', 'john cooper works', 'jcw', 'chili', 'yours', 'pepper'] },
+    tesla: { entree: ['standard', 'propulsion'], milieu: ['grande autonomie', 'long range'], haut: ['performance'] },
+  },
+  colors: {
+    neutral: ['noir', 'gris', 'blanc', 'argent', 'silver', 'anthracite'],
+    atypical: ['rose', 'jaune', 'violet', 'mauve', 'orange', 'vert pomme', 'bicolore', 'covering', 'kit carrosserie'],
+  },
+  staleRatio: 1.5,
+};
+
 /** 💎 MASTERCLASS : pépite à marge réelle >= 2 x le seuil, sans aucun signal de risque, prix crédible (>= 60 % de la cote). */
 export const MASTERCLASS = { marginMultiplier: 2, minPriceRate: 0.6, scoreBonus: 10 };
 

@@ -38,6 +38,7 @@ export const PHOTO_CHECKLIST = [
   'Carrosserie : même teinte partout, jeux de portes et capot réguliers',
   'Pneus : même marque et usure régulière sur un essieu',
   'Intérieur : usure volant, pommeau et siège conducteur cohérente avec les km',
+  'Finition : sellerie, jantes, écran et couleur, est-ce que ça plaira à un acheteur ?',
   'Photos : celles du vrai véhicule (pas constructeur), toutes les faces montrées',
 ];
 

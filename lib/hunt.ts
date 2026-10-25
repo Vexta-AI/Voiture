@@ -205,6 +205,7 @@ async function alertOn(config: Config, priced: ReturnType<typeof priceListings>[
           comparables: alert.market.comparables,
           buyers: matchBuyers(alert.listing, buyers).map((m) => ({ name: m.buyer.name, budgetMax: m.buyer.criteria.budgetMax })),
           inspection,
+          sellability: alert.analysis.sellability,
         }),
       });
       await markAlertSent(alert.key, { listingId: alert.listing.id, strategy: alert.payload.strategy, score: alert.analysis.score });

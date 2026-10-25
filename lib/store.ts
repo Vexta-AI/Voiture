@@ -156,11 +156,12 @@ export async function batchProgress(batchId: string) {
 /** Nombre de runs stockés et d'annonces, par source. */
 export async function runsSummary(days: number) {
   const runs = await loadRuns(days);
-  const bySource: Record<string, { runs: number; listings: number; last: string }> = {};
+  const bySource: Record<string, { runs: number; listings: number; withPhotos: number; last: string }> = {};
   for (const r of runs) {
-    const s = (bySource[r.source] ??= { runs: 0, listings: 0, last: r.fetchedAt });
+    const s = (bySource[r.source] ??= { runs: 0, listings: 0, withPhotos: 0, last: r.fetchedAt });
     s.runs += 1;
     s.listings += r.listings.length;
+    s.withPhotos += r.listings.filter((l) => l.photos && l.photos.length > 0).length;
     if (r.fetchedAt > s.last) s.last = r.fetchedAt;
   }
   return bySource;

@@ -44,6 +44,8 @@ export interface Listing {
   repost?: { previousId: string; firstSeenAt: string; previousPrice: number };
   /** Photos de l'annonce (URL) */
   photos?: string[];
+  /** Couleur (attribut LeBonCoin) */
+  color?: string;
   /** Inspection IA des photos (indicative, jamais une expertise) */
   inspection?: Inspection;
   /** Puissance fiscale (CV) : base de la carte grise */

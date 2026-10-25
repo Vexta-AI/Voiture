@@ -155,6 +155,7 @@ export function normalizeApifyItem(item, context) {
       source: item.owner_type === 'pro' ? 'LeBonCoin · Pro' : 'LeBonCoin · Particulier',
       url: item.url ?? item.link ?? item.ad_url ?? `https://www.leboncoin.fr/ad/${context.type === 'moto' ? 'motos' : 'voitures'}/${id}`,
       photos: extractPhotos(item),
+      color: attr(item, 'vehicule_color', 'vehicle_color', 'color', 'couleur') ? String(attr(item, 'vehicule_color', 'vehicle_color', 'color', 'couleur')) : undefined,
       lat: toCoord(item.location_lat ?? item.lat),
       lng: toCoord(item.location_lng ?? item.lng),
       zip: zip ? String(zip) : undefined,

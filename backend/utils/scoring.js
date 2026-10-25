@@ -45,6 +45,7 @@ import {
 } from '../config/rules.js';
 import { distanceKm as gpsDistanceKm } from '../pipeline/geo.js';
 import { offerPriceFor } from './messages.js';
+import { sellability } from './sellability.js';
 import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplacement } from './text.js';
 
 /**
@@ -86,6 +87,7 @@ import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplaceme
  * @property {string} [location]
  * @property {string} [source]
  * @property {string} [url]
+ * @property {string} [color]
  * @property {{ verdict: 'rassurant'|'a_verifier'|'suspect', summary: string, questions: string[] }} [inspection] inspection IA des photos (indicative)
  */
 
@@ -673,6 +675,7 @@ export function scoreListing(listing, options = {}) {
     status,
     masterclass,
     priceReasons: why,
+    sellability: sellability(listing, { triggers, daysOnline: online }),
     quality,
     prudent: { margin: prudentMargin, buyerDiscount, slowDays, isEv },
     local: local && localMargin !== null ? { ...local, margin: localMargin } : null,
