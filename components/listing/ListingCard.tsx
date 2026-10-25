@@ -59,6 +59,11 @@ export function ListingCard({
 
   return (
     <article className={cn('card flex flex-col overflow-hidden', refused && 'opacity-80', analysis.masterclass && 'ring-2 ring-violet-500')}>
+      {(!listing.photos || listing.photos.length === 0) && url && (
+        <a href={url} target="_blank" rel="noreferrer" className="flex aspect-[16/9] items-center justify-center bg-ink-100 text-sm font-medium text-ink-600 hover:text-ink-900">
+          📷 Photos sur l&apos;annonce ↗
+        </a>
+      )}
       {listing.photos && listing.photos.length > 0 && (
         <a href={url ?? undefined} target="_blank" rel="noreferrer" className="relative block aspect-[16/9] bg-ink-100">
           {/* eslint-disable-next-line @next/next/no-img-element -- photos LeBonCoin externes, pas d'optimisation Next */}
@@ -235,6 +240,26 @@ export function ListingCard({
             <ul className="space-y-0.5 text-ink-600">
               {(open ? analysis.priceReasons.reasons : analysis.priceReasons.reasons.slice(0, 3)).map((r) => (
                 <li key={r}>• {r}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {!refused && (
+          <div
+            className={cn(
+              'rounded-lg px-3 py-2 text-xs',
+              analysis.sellability.level === 'difficile' ? 'bg-rose-50 dark:bg-rose-500/10' : analysis.sellability.level === 'moyenne' ? 'bg-amber-50 dark:bg-amber-500/10' : 'bg-emerald-50 dark:bg-emerald-500/10',
+            )}
+          >
+            <p className="font-semibold text-ink-900">
+              🏷 Revente : {analysis.sellability.level === 'facile' ? 'devrait partir facilement' : analysis.sellability.level === 'moyenne' ? 'à surveiller' : 'risque de traîner'}
+            </p>
+            <ul className="mt-0.5 space-y-0.5 text-ink-700">
+              {analysis.sellability.points.map((p) => (
+                <li key={p.label}>
+                  {p.tone === 'good' ? '✓' : p.tone === 'warn' ? '⚠' : '•'} {p.label}
+                </li>
               ))}
             </ul>
           </div>

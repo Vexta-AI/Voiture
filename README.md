@@ -198,6 +198,16 @@ Chaque deal mené dans le CRM mesure la réalité, à comparer aux hypothèses d
 
 À partir de 3 deals, une mesure devient une **proposition de réglage**, jamais appliquée sans ton accord (`backend/utils/learning.js`). Ces chiffres n'existent que dans ton CRM : c'est l'avantage que personne ne peut copier.
 
+## Vendabilité : la voiture partira-t-elle vite ?
+
+À modèle égal, la finition, les options et la couleur font qu'une voiture se revend en une semaine ou traîne des mois. Exemple : une Golf mal finie (intérieur, jantes) qui ne part pas, ou une CLA qui se vend mal sans toit ouvrant. Chaque carte et chaque alerte affichent **🏷 Revente** (facile, à surveiller, risque de traîner) avec les raisons :
+- **niveau de finition** lu dans le titre : entrée de gamme, intermédiaire ou haute ;
+- **options recherchées** : toit ouvrant ou panoramique, packs AMG, S-Line, M-Sport… ;
+- **couleur** ;
+- **annonce qui traîne** : en ligne bien plus longtemps que les annonces comparables.
+
+Le prix marché compare désormais des voitures **du même niveau de finition** quand il est connu, pour qu'une Trendline ne soit plus cotée au prix d'une Carat. La vendabilité ne change ni la marge ni le score. La check-list photos ajoute « finition : sellerie, jantes, écran, couleur ».
+
 ## Pépites à vérifier (cote peu fiable)
 
 Une pépite dont la cote est **faible** (peu de comparables, prix dispersés) ne reçoit jamais d'offre automatique. Elle déclenche une alerte Telegram **🔎 PÉPITE À VÉRIFIER** (3 par run au maximum, choix métier) et une fiche CRM. Chacune contient :
@@ -250,6 +260,9 @@ Chaque chiffre du radar est soit **sourcé**, soit **un choix métier signalé c
 | Cotisations micro-entreprise | 12,3 % du prix de revente (achat-revente, prix local pour la revente chez toi) ; 21,2 % de la commission + upsells (mandat) ; déduites aussi dans le CRM | Taux 2026 sur le **chiffre d'affaires** encaissé ([economie.gouv.fr](https://www.economie.gouv.fr/entreprises/micro-entreprise-auto-entreprise-charges-sociales)) | Sourcé ; `BUSINESS.status` dans `rules.js`, **actuellement `particulier`** (choix de l'utilisateur : marges sans cotisations en attendant la déclaration, à repasser en `micro` ensuite) |
 | TVA en pro | non déduite | Franchise en base : 85 000 € de CA en vente de marchandises en 2026 ([Legifiscal](https://www.legifiscal.fr/actualites-fiscales/4436-nouveaux-seuils-micro-entreprises-annee-2026.html)) ; au-delà, TVA sur la marge (art. 297 A du CGI) | À valider avec un comptable avant de passer pro |
 | Bonus campagne, points forts, MASTERCLASS | +5 / +2 par point / ×2 seuil | Choix métier pour trier (ne changent jamais la marge) | Choix métier |
+| Vendabilité : finition | entrée de gamme ⚠, intermédiaire ✓, haute ✓ (surcoût pas toujours récupéré) ; comparables limités au même niveau de finition quand il est connu | « Les modèles d'entrée de gamme seront souvent plus compliqués à revendre à bon prix », « les variantes intermédiaires se retrouvent généralement mieux placées » ([L'argus, 2023](https://www.largus.fr/actualite-automobile/quelles-voitures-francaises-a-essence-decotent-le-plus-30030557.html)) ; liste des finitions par marque = nomenclature constructeur | Sourcé (principe) ; correspondance finition → niveau = choix métier, à compléter |
+| Vendabilité : couleur | noir, gris, blanc ✓ ; rose, jaune, violet, personnalisée ⚠ (aucun montant) | Couleurs les plus vendues et couleurs qui peuvent faire baisser le prix ([Capcar, 2019](https://www.capcar.fr/blog/la-couleur-a-t-elle-une-influence-sur-la-valeur-de-votre-voiture-doccasion), site commercial) ; aucune étude française récente chiffrée | Signal seulement |
+| Vendabilité : annonce qui traîne | en ligne > 1,5 × la médiane des comparables (et ≥ 15 j) | Expérience de l'utilisateur (Golf mal finie, CLA sans toit ouvrant) | Choix métier |
 | Coût de l'inspection IA | tokens × 4 $ / 20 $ par million (entrée / sortie), affiché « estimé » | Tarif Claude Opus 5.5 ([Anthropic, pricing](https://platform.claude.com/docs/en/about-claude/pricing)) ; images limitées à 5 Mo ([Anthropic, vision](https://platform.claude.com/docs/en/build-with-claude/vision)) | Sourcé ; quelques centimes par annonce, à vérifier sur ta console Anthropic |
 | Inspection IA : 6 photos, 0 auto par run, budget 20 $/mois, écart compteur > 5 % et 2 000 km | — | Limites d'usage et seuil d'alerte | Choix métier (réglables dans Vercel) |
 | Check-list photos | 6 points | Points de contrôle courants d'un véhicule d'occasion | Choix métier |

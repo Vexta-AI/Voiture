@@ -10,6 +10,7 @@
 
 import { PRICE_SIGNALS } from '../config/rules.js';
 import { adUrl } from '../utils/links.js';
+import { trimOf } from '../utils/sellability.js';
 import { compact, findPattern, normalize } from '../utils/text.js';
 import { distanceKm } from './geo.js';
 
@@ -134,6 +135,8 @@ export function estimateMarketPrice(listing, pool, minComparables = MARKET_RULES
   const fuel = fuelOf(listing);
   const gearbox = gearboxOf(listing);
   const power = powerOf(listing);
+  // Finition : une entrée de gamme ne se compare pas à une finition haute (elle se revend moins bien, L'argus).
+  const trim = trimOf(listing)?.tier ?? null;
   const sameModel = pool.filter((p) => p.id !== listing.id && p.price > 0 && modelKey(p) === key);
   // État : les annonces accidentées / en panne tirent la médiane vers le bas, on les écarte.
   const healthy = sameModel.filter((p) => !isDamaged(p));
@@ -151,6 +154,8 @@ export function estimateMarketPrice(listing, pool, minComparables = MARKET_RULES
       if (gearbox && pg && pg !== gearbox) return false;
       const pp = powerOf(p);
       if (power && pp && Math.abs(pp - power) > power * w.powerRate) return false;
+      const pt = trim ? trimOf(p)?.tier : null;
+      if (trim && pt && pt !== trim) return false;
       return true;
     });
     if (comps.length < minComparables) continue;
@@ -158,6 +163,7 @@ export function estimateMarketPrice(listing, pool, minComparables = MARKET_RULES
       fuel ? `même carburant (${fuel})` : 'carburant non vérifié',
       gearbox ? `même boîte (${gearbox})` : 'boîte non vérifiée',
       power ? `puissance ±${Math.round(w.powerRate * 100)} % (${power} ch)` : 'puissance non vérifiée',
+      trim ? `même niveau de finition (${trim === 'entree' ? 'entrée de gamme' : trim === 'milieu' ? 'intermédiaire' : 'haute'})` : 'finition non vérifiée',
       `année ±${w.years}`,
       listing.mileage ? `km ±${Math.round(tolerance / 1000)} 000` : 'km non vérifié',
       ...(damagedExcluded > 0 ? [`${damagedExcluded} annonce(s) accidentée(s) / en panne écartée(s)`] : []),
@@ -219,6 +225,10 @@ export function estimateLocalPrice(listing, pool, base) {
 /** Dédoublonne un stock d'annonces par id en gardant la version la plus récente du tableau. */
 export function dedupeById(listings) {
   const map = new Map();
-  for (const l of listings) map.set(l.id, l);
+  for (const l of listings) {
+    // Dernier relevé gagnant, mais on garde les photos d'un relevé précédent s'il en avait.
+    const prev = map.get(l.id);
+    map.set(l.id, !l.photos?.length && prev?.photos?.length ? { ...l, photos: prev.photos } : l);
+  }
   return [...map.values()];
 }

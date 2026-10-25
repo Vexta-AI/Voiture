@@ -16,7 +16,7 @@ const MAX_LENGTH = 4096;
 
 /**
  * @param {Extract<ReturnType<import('../utils/outreach.js').buildOutreachPayload>, { ok: true }>} payload
- * @param {{ comparables?: number, buyers?: { name: string, budgetMax: number }[], inspection?: any }} [context]
+ * @param {{ comparables?: number, buyers?: { name: string, budgetMax: number }[], inspection?: any, sellability?: any }} [context]
  */
 export function formatTelegramAlert(payload, context = {}) {
   const { listing, scoring, negotiation, mandate, message } = payload;
@@ -37,6 +37,7 @@ export function formatTelegramAlert(payload, context = {}) {
     lines.push(`🏠 Revente chez toi : <b>${eur(scoring.localResale.price)}</b> (${scoring.localResale.comparables} annonces &lt; ${scoring.localResale.radiusKm} km) → marge <b>${eur(scoring.localResale.margin)}</b>`);
   }
   if (scoring.reasons?.length) lines.push(`<i>Pourquoi ce prix :</i> ${scoring.reasons.slice(0, 3).map(escape).join(' ')}`);
+  if (context.sellability) lines.push(sellabilityLine(context.sellability));
   if (payload.strategy === 'negotiation' && negotiation) {
     lines.push(`Offre : <b>${eur(negotiation.offerPrice)}</b> (−${eur(negotiation.discount)}) · marge négociée ${eur(scoring.negotiatedNetMargin)}`);
   }
@@ -65,6 +66,14 @@ export function formatTelegramAlert(payload, context = {}) {
   return `${header}\n<pre>${body}</pre>`;
 }
 
+const SELL_LABEL = { facile: '✅ devrait partir facilement', moyenne: '🟠 à surveiller', difficile: '🔴 risque de traîner' };
+
+/** Ligne « revente » : niveau + les deux premiers points (finition, options, couleur, annonce qui traîne). */
+function sellabilityLine(s) {
+  const points = s.points.filter((p) => p.tone !== 'info').slice(0, 2).map((p) => escape(p.label.replace(/ \(L'argus\)| \(guides du secteur\)/g, '')));
+  return `🏷 <i>Revente :</i> ${SELL_LABEL[s.level] ?? s.level}${points.length ? ` · ${points.join(' · ')}` : ''}`;
+}
+
 /**
  * Alerte « à vérifier » : pépite sur le papier, cote peu fiable. Pas d'offre chiffrée : on vérifie d'abord.
  * @param {import('../utils/scoring.js').Listing} listing
@@ -82,6 +91,7 @@ export function formatVerifyAlert(listing, analysis) {
     '<i>Avant toute offre, vérifie la cote :</i>',
     `• <a href="${escape(links.argus)}">Cote L'argus</a> (version exacte, année, km)`,
     `• <a href="${escape(links.leboncoin)}">Annonces comparables LeBonCoin</a> (même modèle, année ±1, km ±30 %)`,
+    sellabilityLine(analysis.sellability),
     `👀 <i>Photos :</i> ${PHOTO_CHECKLIST.map((c) => escape(c.split(' : ')[0].toLowerCase())).join(', ')}`,
   ];
   if (url) lines.push(`<a href="${escape(url)}">👉 Ouvrir l'annonce</a>`);
