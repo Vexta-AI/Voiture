@@ -7,7 +7,7 @@
  *   3. Défauts détectés -> leviers de négociation (baisse de prix argumentée)
  *   4. Formule financière :
  *        Marge Brute  = Cote Marché Pro (+ bonus options) - Prix Affiché
- *        Marge Nette  = Marge Brute - 500 € (remise en état) - 200 € (capital risque)
+ *        Marge Nette  = Marge Brute - 500 € (350 € sous 5 000 €) de remise en état - 200 € (capital risque)
  *        Marge réelle = Marge Nette - carte grise - assurance temporaire - annonce - trajet / rapatriement
  *   5. Statut : 🔥 PÉPITE POTENTIELLE / A SURVEILLER / REFUSE
  *   6. Éligibilité Dépôt-Vente / Mandat (annonce en ligne depuis plus de 14 jours)
@@ -133,6 +133,11 @@ export function daysOnline(listing, now = new Date()) {
   const published = new Date(start).getTime();
   if (Number.isNaN(published)) return 0;
   return Math.max(0, Math.floor((now.getTime() - published) / DAY_MS));
+}
+
+/** Remise en état prévue : 350 € sous 5 000 € (petits budgets), 500 € au-delà (rules.js). */
+export function reconditioningCost(price) {
+  return Number(price) > 0 && Number(price) < COSTS.RECONDITIONING_SMALL.maxPrice ? COSTS.RECONDITIONING_SMALL.cost : COSTS.RECONDITIONING_BASE;
 }
 
 export function classifySegment(listing) {
@@ -518,7 +523,8 @@ export function scoreListing(listing, options = {}) {
   const marketPrice = Number(listing.marketPrice) || 0;
   // Règle d'or : la marge se calcule sur la cote pro seule. Les options sont un potentiel, jamais acquis.
   const grossMargin = marketPrice - askingPrice;
-  const fixedCosts = COSTS.RECONDITIONING_BASE + COSTS.RISK_CAPITAL;
+  const reconditioning = reconditioningCost(askingPrice);
+  const fixedCosts = reconditioning + COSTS.RISK_CAPITAL;
   const netMargin = grossMargin - fixedCosts;
   /** Valeur perçue avec options déclencheurs (argument de revente, hors statut). */
   const resaleValue = marketPrice + triggersBonus;
@@ -713,7 +719,7 @@ export function scoreListing(listing, options = {}) {
       socialCharges,
       registration,
       realNetMargin,
-      reconditioning: COSTS.RECONDITIONING_BASE,
+      reconditioning,
       riskCapital: COSTS.RISK_CAPITAL,
       netMargin,
       leversTotal,

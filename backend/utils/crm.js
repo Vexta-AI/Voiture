@@ -89,7 +89,7 @@ export function createDeal({ kind, listing, analysis, message = null, offerPrice
           registrationCost: f.registrationCost,
           transportCost: f.transportCost,
           ownershipCost: f.ownership?.total ?? 0,
-          reconditioning: COSTS.RECONDITIONING_BASE,
+          reconditioning: f.reconditioning ?? COSTS.RECONDITIONING_BASE,
           score: analysis.score,
         };
   return {

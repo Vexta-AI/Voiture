@@ -19,6 +19,12 @@ export const COSTS = {
    * ~600 € + 120 € de préparation sur une 9 900 €, et les factures dépassent souvent le devis (README, Sources).
    */
   RECONDITIONING_BASE: 500,
+  /**
+   * Petits budgets (< 5 000 €) : 350 € de remise en état (detailing pro 80-90 € + petite intervention méca),
+   * valeur du guide de l'utilisateur, validée par lui le 26/10/2026 après sa 206 achetée 4 000 € et revendue
+   * 5 000 € avec peu de frais. Choix métier, à corriger avec les frais réels mesurés dans le CRM (apprentissage).
+   */
+  RECONDITIONING_SMALL: { maxPrice: 5000, cost: 350 },
   /** Capital risque systématique : imprévu ou négo de l'acheteur final. */
   RISK_CAPITAL: 200,
   /** Coût réel d'un detailing pro intérieur/extérieur. */
@@ -62,7 +68,9 @@ export const MAX_TRIGGER_BONUS = 2500;
 // ---------------------------------------------------------------------------
 
 export const BUDGETS = {
-  auto: { min: 3000, max: 30000, label: 'Chasse Auto (3k€ - 30k€)' },
+  // 1 500 € (au lieu de 3 000 €) : validé par l'utilisateur le 26/10/2026, pour voir les 206 / 207 / Twingo
+  // (son guide : citadines de 1 500 € à 8 000 €).
+  auto: { min: 1500, max: 30000, label: 'Chasse Auto (1,5k€ - 30k€)' },
   moto: { min: 5000, max: 18000, label: 'Chasse Moto (5k€ - 18k€)' },
 };
 
@@ -75,7 +83,7 @@ export const SEGMENTS = {
     label: 'Citadine',
     pepiteThreshold: 1000,
     targetNetMargin: [800, 1500],
-    budget: [3000, 6000],
+    budget: [1500, 6000],
   },
   compacte: {
     label: 'Compacte',
@@ -142,6 +150,7 @@ export const SEGMENT_RULES = [
 /** Tranches de budget (filtres du dashboard). */
 export const PRICE_BANDS = {
   auto: [
+    { id: 'a0', label: '1,5–3 k€', min: 1500, max: 3000 },
     { id: 'a1', label: '3–6 k€', min: 3000, max: 6000 },
     { id: 'a2', label: '6–10 k€', min: 6000, max: 10000 },
     { id: 'a3', label: '10–20 k€', min: 10000, max: 20000 },
