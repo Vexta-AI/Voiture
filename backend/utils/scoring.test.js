@@ -136,17 +136,23 @@ describe('Blacklist mécanique', () => {
     assert.ok(a.blacklist.some((b) => b.id === 'psa-puretech'));
   });
 
-  it('accepte le PureTech avec facture < 6 mois, sous condition de -30 %', () => {
+  it('refuse le PureTech avant 2023 même avec facture de courroie (revente trop difficile, choix du 26/10/2026)', () => {
     const puretech = { brand: 'Peugeot', model: '208', engine: '1.2 PureTech 100', year: 2020, marketPrice: 10000 };
-    const desc = 'Courroie et crépine remplacées il y a 4 mois, facture.';
-    const ok = score({ ...puretech, price: 6900, description: desc });
-    assert.equal(ok.blacklist.length, 0);
-    assert.equal(ok.puretechCondition?.maxBuyPrice, 7000);
-    assert.equal(ok.status.key, 'PEPITE');
-    const tooExpensive = score({ ...puretech, price: 7500, description: desc });
-    assert.equal(tooExpensive.status.key, 'SURVEILLER');
-    const oldBelt = score({ ...puretech, price: 6900, description: 'Courroie changée il y a 14 mois.' });
-    assert.ok(oldBelt.blacklist.some((b) => b.id === 'psa-puretech'));
+    const a = score({ ...puretech, price: 6900, description: 'Courroie et crépine remplacées il y a 4 mois, facture.' });
+    assert.ok(a.blacklist.some((b) => b.id === 'psa-puretech'));
+    assert.equal(a.puretechCondition, null);
+    assert.equal(score({ ...puretech, year: 2023, price: 6900 }).blacklist.length, 0, 'chaîne depuis 2023');
+  });
+
+  it('fiabilité à surveiller : avertissement sans refus (THP, Mini Prince, TSI EA111, N47, EcoBoost)', () => {
+    const warn = (o) => score(o).warnings.some((w) => /^Fiabilité/.test(w));
+    assert.ok(warn({ brand: 'Peugeot', model: '308', engine: '1.6 THP 156', year: 2011 }));
+    assert.ok(warn({ brand: 'Mini', model: 'Mini', title: 'Mini Cooper S 175', year: 2010 }));
+    assert.ok(warn({ brand: 'Volkswagen', model: 'Golf', title: 'Golf 6 1.4 TSI 122', year: 2010 }));
+    assert.ok(warn({ brand: 'Bmw', model: 'Serie 3', title: 'BMW 320d 177', year: 2009 }));
+    assert.ok(warn({ brand: 'Ford', model: 'Focus', title: 'Focus 1.0 EcoBoost 125', year: 2016 }));
+    assert.ok(!warn({ brand: 'Volkswagen', model: 'Golf', title: 'Golf 7 1.4 TSI 125', year: 2016 }), 'EA211 après 2014');
+    assert.equal(score({ brand: 'Peugeot', model: '308', engine: '1.6 THP 156', year: 2011 }).blacklist.length, 0);
   });
 
   it('refuse la DSG7 à sec DQ200 sur petit moteur mais pas la DQ381 (2.0)', () => {

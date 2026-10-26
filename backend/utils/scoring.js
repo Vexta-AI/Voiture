@@ -33,6 +33,7 @@ import {
   MARKET_TRUTH,
   MASTERCLASS,
   PRICE_BANDS,
+  RELIABILITY_WATCH,
   PRICE_SIGNALS,
   QUALITY_SIGNALS,
   REGISTRATION,
@@ -244,7 +245,9 @@ function checkBlacklist(listing, text) {
   const isPuretech = /pure ?tech/.test(engineText) || /1[.,]2 pure ?tech/.test(text) || (brand.includes('opel') && /1[.,]2\s*turbo/.test(engineText));
   if (pt.brands.some((b) => brand.includes(b)) && isPuretech && listing.year < pt.beforeYear) {
     const belt = detectBeltHistory(listing, text);
-    if (belt.status === 'none' || belt.status === 'old') {
+    if (!pt.allowWithBeltInvoice) {
+      hits.push({ id: pt.id, label: pt.label, reason: pt.reason });
+    } else if (belt.status === 'none' || belt.status === 'old') {
       hits.push({
         id: pt.id,
         label: `${pt.label} sans historique de courroie récent`,
@@ -277,6 +280,15 @@ function checkBlacklist(listing, text) {
     } else if (isDsg && (smallEngine || displacement === null) && !isWet) {
       warnings.push('Boîte DSG/S tronic sur petit moteur : vérifier le code boîte (DQ200 à sec = blacklist).');
     }
+  }
+
+  // Fiabilité à surveiller : avertissement (pas de refus), repris dans la vendabilité.
+  for (const r of RELIABILITY_WATCH) {
+    if (!r.brands.some((b) => brand.includes(b))) continue;
+    if (r.yearFrom && listing.year < r.yearFrom) continue;
+    if (r.yearTo && listing.year > r.yearTo) continue;
+    const hit = r.pattern.test(engineText) || r.pattern.test(text) || Boolean(r.alsoIf?.({ brand, year: listing.year, text: engineText }));
+    if (hit) warnings.push(`Fiabilité : ${r.label}, ${r.reason}. Exiger l'historique d'entretien complet, revente plus difficile.`);
   }
 
   return { hits, warnings, puretechCondition };
@@ -682,7 +694,7 @@ export function scoreListing(listing, options = {}) {
     status,
     masterclass,
     priceReasons: why,
-    sellability: sellability(listing, { triggers, daysOnline: online }),
+    sellability: sellability(listing, { triggers, daysOnline: online, reliability: warnings.filter((w) => w.startsWith('Fiabilité')) }),
     quality,
     prudent: { margin: prudentMargin, buyerDiscount, slowDays, isEv },
     local: local && localMargin !== null ? { ...local, margin: localMargin } : null,
