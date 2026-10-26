@@ -65,6 +65,10 @@ const MARKET_QUERIES = {
     megane: ['renault megane'],
     duster: ['dacia duster'],
     corsa: ['opel corsa'],
+    206: ['peugeot 206'],
+    207: ['peugeot 207'],
+    classeb: ['mercedes classe b'],
+    smart: ['smart fortwo', 'smart forfour'],
   },
   moto: {
     mt07: ['mt-07'],

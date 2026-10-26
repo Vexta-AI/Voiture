@@ -111,7 +111,7 @@ export const SEGMENTS = {
 export const SEGMENT_RULES = [
   {
     segment: 'premium',
-    patterns: ['tesla', 'classea', 'aclass', 'audia3', 'audis3', 'serie1', 'golfgti', 'golfr'],
+    patterns: ['tesla', 'classea', 'aclass', 'classeb', 'bclass', 'audia3', 'audis3', 'serie1', 'golfgti', 'golfr'],
     versionPatterns: ['gti', 'golfr', 'amg'],
   },
   {
@@ -128,6 +128,7 @@ export const SEGMENT_RULES = [
     patterns: [
       'clio', 'twingo', '208', 'peugeot108', 'polo', 'citroenc3', 'citroenc1', 'corsa', 'yaris', 'aygo',
       'sandero', 'ibiza', 'fiesta', 'hyundaii10', 'hyundaii20', 'micra', 'fabia', 'volkswagenup', 'citigo', 'zoe', 'swift',
+      'peugeot206', 'peugeot207', 'smart', 'fortwo', 'forfour',
     ],
   },
   {
@@ -247,6 +248,11 @@ export const AUTO_TARGETS = [
   { id: 'megane', label: 'Mégane', brands: ['renault'], patterns: ['megane'], market: true },
   { id: 'duster', label: 'Duster', brands: ['dacia'], patterns: ['duster'], market: true },
   { id: 'corsa', label: 'Corsa', brands: ['opel'], patterns: ['corsa'], market: true },
+  // Modèles revendus par les pros suivis par l'utilisateur (vidéos YouTube) : faciles à vendre avec de bonnes options.
+  { id: '206', label: '206', brands: ['peugeot'], patterns: ['peugeot206', '206'], market: true },
+  { id: '207', label: '207', brands: ['peugeot'], patterns: ['peugeot207', '207'], market: true },
+  { id: 'classeb', label: 'Classe B', brands: ['mercedes', 'mercedesbenz'], patterns: ['classeb', 'b180', 'b200', 'b220'], market: true },
+  { id: 'smart', label: 'Smart', brands: ['smart'], patterns: ['fortwo', 'forfour'], market: true },
 ];
 
 export const MOTO_TARGETS = [
