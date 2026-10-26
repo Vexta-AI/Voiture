@@ -8,10 +8,35 @@ import { ondemandSource } from '../config/sources.js';
 import { cleanModel } from './normalize.js';
 import { buildOutreachPayload } from '../utils/outreach.js';
 import { scoreListing } from '../utils/scoring.js';
-import { MARKET_RULES, estimateLocalPrice, estimateMarketPrice } from './market.js';
+import { MARKET_RULES, estimateLocalPrice, estimateMarketPrice, isDamaged, modelKey } from './market.js';
+import { trimOf } from '../utils/sellability.js';
+import { adUrl } from '../utils/links.js';
 
 /** Alertes max par run : au-delà, c'est que la cote est faussée, pas que le marché déborde de pépites. */
 export const MAX_ALERTS_PER_RUN = 10;
+
+/**
+ * Concurrence à la revente : annonces du même modèle (et même niveau de finition si connu), au moins aussi
+ * récentes et MOINS kilométrées, affichées sous ton futur prix de revente. Ce sont elles que ton acheteur
+ * verra à côté de ta voiture (guide de l'utilisateur : ne jamais borner le km par le bas).
+ * @param {import('../utils/scoring.js').Listing} listing
+ * @param {import('../utils/scoring.js').Listing[]} pool
+ * @param {number} resalePrice
+ */
+export function resaleCompetition(listing, pool, resalePrice) {
+  const key = modelKey(listing);
+  const trim = trimOf(listing)?.tier ?? null;
+  const rivals = pool
+    .filter((p) => p.id !== listing.id && p.price > 0 && p.price <= resalePrice && modelKey(p) === key && !isDamaged(p))
+    .filter((p) => p.year >= listing.year && (!listing.mileage || (p.mileage && p.mileage <= listing.mileage)))
+    .filter((p) => !trim || !trimOf(p) || trimOf(p)?.tier === trim)
+    .sort((a, b) => a.price - b.price);
+  return {
+    count: rivals.length,
+    resalePrice,
+    samples: rivals.slice(0, 3).map((p) => ({ id: p.id, title: p.title, price: p.price, year: p.year, mileage: p.mileage, url: adUrl(p) })),
+  };
+}
 
 /**
  * Fixe la cote de chaque annonce à partir du stock de comparables.
@@ -41,6 +66,7 @@ export function priceListings(listings, pool, options = {}) {
           confidence: market.confidence,
           samples: market.samples,
         },
+        competition: resaleCompetition(listing, pool, local?.price ?? market.price),
         ...(local ? { localMarket: { price: local.price, low: local.low, high: local.high, comparables: local.comparables, daysOnMarket: local.daysOnMarket, radiusKm: local.radiusKm, criteria: local.criteria } } : {}),
       },
       market,

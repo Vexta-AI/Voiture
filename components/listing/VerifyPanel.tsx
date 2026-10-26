@@ -17,7 +17,7 @@ export function VerifyPanel({ listing, analysis }: { listing: Listing; analysis:
           Cote L&apos;argus ↗
         </a>
         <a className="font-medium text-sky-700 underline dark:text-sky-400" href={links.leboncoin} target="_blank" rel="noreferrer">
-          Annonces comparables (année ±1, km ±30 %) ↗
+          Annonces comparables (année ±1, moins kilométrées incluses) ↗
         </a>
       </p>
       <details>

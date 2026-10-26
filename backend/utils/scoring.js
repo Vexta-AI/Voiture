@@ -88,6 +88,7 @@ import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplaceme
  * @property {string} [source]
  * @property {string} [url]
  * @property {string} [color]
+ * @property {{ count: number, resalePrice: number, samples: { id: string, title: string, price: number, year: number, mileage: number, url: string|null }[] }} [competition]
  * @property {{ verdict: 'rassurant'|'a_verifier'|'suspect', summary: string, questions: string[] }} [inspection] inspection IA des photos (indicative)
  */
 

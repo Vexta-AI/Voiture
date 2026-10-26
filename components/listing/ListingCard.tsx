@@ -262,6 +262,25 @@ export function ListingCard({
                 </li>
               ))}
             </ul>
+            {listing.competition && listing.competition.samples.length > 0 && (
+              <details className="mt-1">
+                <summary className="cursor-pointer text-ink-600">Concurrentes moins kilométrées ({listing.competition.count})</summary>
+                <ul className="mt-1 space-y-0.5">
+                  {listing.competition.samples.map((c) => (
+                    <li key={c.id}>
+                      {c.url ? (
+                        <a className="text-sky-700 underline dark:text-sky-400" href={c.url} target="_blank" rel="noreferrer">
+                          {c.title}
+                        </a>
+                      ) : (
+                        c.title
+                      )}{' '}
+                      · {c.year} · {km(c.mileage)} · {eur(c.price)}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </div>
         )}
 

@@ -90,7 +90,7 @@ export function formatVerifyAlert(listing, analysis) {
     `Prix ${eur(listing.price)} · marché estimé ${eur(listing.marketPrice)} (${listing.marketStats?.comparables ?? '?'} annonces seulement) → marge estimée ${eur(analysis.finance.realNetMargin)}`,
     '<i>Avant toute offre, vérifie la cote :</i>',
     `• <a href="${escape(links.argus)}">Cote L'argus</a> (version exacte, année, km)`,
-    `• <a href="${escape(links.leboncoin)}">Annonces comparables LeBonCoin</a> (même modèle, année ±1, km ±30 %)`,
+    `• <a href="${escape(links.leboncoin)}">Annonces comparables LeBonCoin</a> (même modèle, année ±1, moins kilométrées incluses)`,
     sellabilityLine(analysis.sellability),
     `👀 <i>Photos :</i> ${PHOTO_CHECKLIST.map((c) => escape(c.split(' : ')[0].toLowerCase())).join(', ')}`,
   ];

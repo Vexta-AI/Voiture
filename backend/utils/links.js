@@ -15,7 +15,7 @@ export function adUrl(listing) {
 
 /**
  * Liens pour vérifier soi-même la cote d'une annonce : cote L'argus (site commercial, gratuit) et
- * annonces comparables LeBonCoin (même modèle, année ±1, km ±30 %, les moins chères d'abord).
+ * annonces comparables LeBonCoin (même modèle, année ±1, jusqu'à +30 % de km sans plancher, les moins chères d'abord).
  * @param {{ type?: 'auto'|'moto', brand?: string, model?: string, year?: number, mileage?: number }} listing
  */
 export function priceCheckLinks(listing) {
@@ -26,7 +26,8 @@ export function priceCheckLinks(listing) {
   const y = Number(listing.year) || 0;
   const km = Number(listing.mileage) || 0;
   if (y) params.set('regdate', `${y - 1}-${y + 1}`);
-  if (km) params.set('mileage', `${Math.max(0, Math.round((km * 0.7) / 1000) * 1000)}-${Math.round((km * 1.3) / 1000) * 1000}`);
+  // Jamais de plancher de km : les voitures moins kilométrées et moins chères sont tes vraies concurrentes.
+  if (km) params.set('mileage', `0-${Math.round((km * 1.3) / 1000) * 1000}`);
   params.set('sort', 'price');
   params.set('order', 'asc');
   return { argus: 'https://www.largus.fr/cote-auto.html', leboncoin: `https://www.leboncoin.fr/recherche?${params}` };

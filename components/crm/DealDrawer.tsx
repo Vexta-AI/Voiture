@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { DOCUMENTS, LOST_REASONS, PIPELINES } from '@/backend/config/crm.js';
+import { DOCUMENTS, LOST_REASONS, PIPELINES, VISIT_CHECKLIST } from '@/backend/config/crm.js';
 import { dealEconomics, leadHeat, listedPriceOf, nextAction } from '@/backend/utils/crm.js';
 import { verdictLabel } from '@/backend/utils/inspection.js';
 import { adUrl } from '@/backend/utils/links.js';
@@ -269,6 +269,20 @@ function DealPanel({ deal, deals, now, onAct, onAddBuyer, onOpen, onDelete }: Pr
           Enregistrer les chiffres
         </button>
       </section>
+
+      {deal.kind === 'achat' && (
+        <section className="space-y-1.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+            Visite ({VISIT_CHECKLIST.filter((d) => deal.docs[d.id]).length}/{VISIT_CHECKLIST.length}) · à cocher sur place avant de payer
+          </h3>
+          {VISIT_CHECKLIST.map((d) => (
+            <label key={d.id} className="flex items-start gap-2 text-sm text-ink-700">
+              <input type="checkbox" className="mt-0.5" checked={Boolean(deal.docs[d.id])} disabled={saving} onChange={(e) => run({ type: 'doc', id: d.id, done: e.target.checked })} />
+              <span className={cn(deal.docs[d.id] && 'text-ink-400 line-through')}>{d.label}</span>
+            </label>
+          ))}
+        </section>
+      )}
 
       <section className="space-y-1.5">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-400">

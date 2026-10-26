@@ -534,11 +534,11 @@ describe('Pépites à vérifier (cote peu fiable)', () => {
     assert.match(m.text, /HistoVec/);
   });
 
-  it('liens de vérification : modèle nettoyé, année ±1, km ±30 %', () => {
+  it('liens de vérification : modèle nettoyé, année ±1, km sans plancher', () => {
     const links = priceCheckLinks({ type: 'auto', brand: 'Mini', model: 'Mini_model all', year: 2012, mileage: 100000 });
     const url = new URL(links.leboncoin);
     assert.equal(url.searchParams.get('text'), 'mini mini');
     assert.equal(url.searchParams.get('regdate'), '2011-2013');
-    assert.equal(url.searchParams.get('mileage'), '70000-130000');
+    assert.equal(url.searchParams.get('mileage'), '0-130000');
   });
 });
