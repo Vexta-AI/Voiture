@@ -68,3 +68,11 @@ describe('Concurrence à la revente', () => {
     assert.equal(c.count, 2);
   });
 });
+
+describe('Fiabilité et revente', () => {
+  it('un moteur à mauvaise réputation suffit à classer la revente « risque de traîner »', () => {
+    const s = sellability({ ...base, brand: 'Peugeot', title: '308 Allure' }, { reliability: ['Fiabilité : 1.6 THP, chaîne. Exiger l’historique.'] });
+    assert.equal(s.level, 'difficile');
+    assert.ok(s.points.some((p) => /beaucoup d’acheteurs l’évitent/.test(p.label)));
+  });
+});

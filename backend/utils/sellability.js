@@ -37,7 +37,7 @@ const TIER_LABEL = { entree: "entrée de gamme", milieu: 'intermédiaire', haut:
 
 /**
  * @param {import('./scoring.js').Listing} listing
- * @param {{ triggers?: { label: string }[], daysOnline?: number }} [context]
+ * @param {{ triggers?: { label: string }[], daysOnline?: number, reliability?: string[] }} [context]
  * @returns {{ level: 'facile'|'moyenne'|'difficile', trim: ReturnType<typeof trimOf>, color: string|null, points: { tone: 'good'|'warn'|'info', label: string }[] }}
  */
 export function sellability(listing, context = {}) {
@@ -48,6 +48,9 @@ export function sellability(listing, context = {}) {
   if (trim?.tier === 'milieu') points.push({ tone: 'good', label: `Finition ${TIER_LABEL.milieu} (${trim.name}) : généralement la mieux placée à la revente (L'argus)` });
   if (trim?.tier === 'haut') points.push({ tone: 'good', label: `Finition ${TIER_LABEL.haut} (${trim.name}) : recherchée, mais son surcoût ne se récupère pas toujours (L'argus)` });
   if (!trim) points.push({ tone: 'info', label: 'Finition non reconnue : vérifie-la sur les photos (sellerie, jantes, écran)' });
+
+  // Moteur à mauvaise réputation : les acheteurs le fuient, même s'il roule bien.
+  for (const r of context.reliability ?? []) points.push({ tone: 'warn', label: r.replace(/ Exiger.*$/, '').replace(/\.$/, '') + ' : beaucoup d’acheteurs l’évitent' });
 
   for (const t of context.triggers ?? []) points.push({ tone: 'good', label: `Option recherchée : ${t.label}` });
 
@@ -71,7 +74,8 @@ export function sellability(listing, context = {}) {
     points.push({ tone: 'good', label: 'Aucune annonce moins kilométrée sous ton prix de revente : peu de concurrence directe' });
   }
 
-  const warns = points.filter((p) => p.tone === 'warn').length;
+  // Un moteur à mauvaise réputation pèse double : il suffit à faire fuir une partie des acheteurs.
+  const warns = points.filter((p) => p.tone === 'warn').length + (context.reliability?.length ?? 0);
   const goods = points.filter((p) => p.tone === 'good').length;
   const level = warns >= 2 || (trim?.tier === 'entree' && warns > goods) ? 'difficile' : warns > goods ? 'moyenne' : 'facile';
   return { level, trim, color, points };

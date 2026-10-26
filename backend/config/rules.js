@@ -298,11 +298,19 @@ export const BLACKLIST = {
     id: 'psa-puretech',
     label: '1.2 PureTech avant 2023',
     reason:
-      "Courroie humide qui se désagrège (crépine bouchée, perte de pression d'huile). Achat uniquement avec facture courroie + crépine < 6 mois ET à -30 % de la cote.",
+      "Courroie humide qui se désagrège (crépine bouchée, perte de pression d'huile) et revente très difficile : les acheteurs et les pros le fuient.",
     brands: ['peugeot', 'citroen', 'ds', 'opel'],
     beforeYear: 2023,
     maxBeltAgeMonths: 6,
     requiredDiscount: 0.3,
+    /**
+     * false = refus systématique, même avec facture de courroie (demande de l'utilisateur le 26/10/2026 :
+     * « le PureTech c'est presque impossible à vendre »). Une question parlementaire rapporte des concessionnaires
+     * qui refusent de reprendre ces modèles ou n'en offrent que des prix dérisoires
+     * (https://questions.assemblee-nationale.fr/dyn/17/questions/QANR5L17QE1396.pdf). Les 1.2 PureTech produits
+     * depuis 2023 passent à la chaîne de distribution (L'argus) et ne sont pas concernés.
+     */
+    allowWithBeltInvoice: false,
   },
   dq200: {
     id: 'vag-dq200',
@@ -315,6 +323,52 @@ export const BLACKLIST = {
     wetPattern: /(dq|dsg) ?-?(381|250|500)|bain d'?huile|embrayage humide|dsg ?6/,
   },
 };
+
+/**
+ * FIABILITÉ À SURVEILLER (pas de refus automatique : un avertissement et un point « revente difficile »).
+ * Moteurs à réputation connue, que les acheteurs évitent : à n'acheter qu'avec un historique d'entretien complet.
+ * Sources : guides du secteur (sites commerciaux, pas d'étude officielle) :
+ *   Fiches-Auto, moteurs essence les moins fiables : https://www.fiches-auto.fr/articles-auto/fiabilite/s-2472-moteurs-essence-les-moins-fiables.php
+ *   Autocopilot, motorisations : https://autocopilot.fr/motorisations
+ *   Presse-Citron, moteurs essence à éviter : https://www.presse-citron.net/auto-voici-la-liste-des-moteurs-essence-a-eviter-en-2023/
+ */
+export const RELIABILITY_WATCH = [
+  {
+    id: 'thp',
+    label: '1.6 THP / Prince (PSA, Mini)',
+    reason: 'chaîne de distribution qui s’allonge, consommation d’huile, encrassement (surtout avant 2013)',
+    brands: ['peugeot', 'citroen', 'ds', 'mini'],
+    pattern: /\bthp\b|1[.,]6 ?(16v )?thp/,
+    // Mini R56 (2006-2013) : moteurs Prince, même famille que le THP.
+    alsoIf: (l) => /mini/.test(l.brand) && l.year >= 2006 && l.year <= 2013 && /cooper|one/.test(l.text),
+    yearTo: 2013,
+  },
+  {
+    id: 'ecoboost-1.0',
+    label: '1.0 EcoBoost (Ford)',
+    reason: 'courroie de distribution humide, rappel constructeur ; vérifier l’historique',
+    brands: ['ford'],
+    pattern: /1[.,]0 ?(l )?ecoboost|ecoboost 1[.,]0/,
+  },
+  {
+    id: 'tsi-ea111',
+    label: '1.2 / 1.4 TSI EA111 (VAG, 2006-2014)',
+    reason: 'chaîne de distribution qui s’allonge, consommation d’huile',
+    brands: ['volkswagen', 'vw', 'audi', 'seat', 'skoda'],
+    pattern: /1[.,][24] ?tsi|1[.,]4 ?tfsi/,
+    yearFrom: 2006,
+    yearTo: 2014,
+  },
+  {
+    id: 'bmw-n47',
+    label: 'BMW 2.0 diesel N47 (2007-2011)',
+    reason: 'chaîne de distribution côté boîte : casse moteur coûteuse',
+    brands: ['bmw'],
+    pattern: /\b(116|118|120|316|318|320|520|x1 ?(s|x)drive ?18|x1 ?(s|x)drive ?20|x3 ?xdrive ?20)d\b|n47/,
+    yearFrom: 2007,
+    yearTo: 2011,
+  },
+];
 
 /** Mots-clés rédhibitoires (regex sur texte normalisé). Négations gérées ("aucun voyant moteur"). */
 export const BLACKLIST_KEYWORDS = [
