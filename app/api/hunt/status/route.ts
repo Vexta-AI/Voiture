@@ -14,7 +14,7 @@ export const maxDuration = 60;
  */
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
-  if (!storeEnabled()) return NextResponse.json({ ok: false, error: 'missing_config', missing: ['BLOB_READ_WRITE_TOKEN'] }, { status: 503 });
+  if (!storeEnabled()) return NextResponse.json({ ok: false, error: 'missing_config', missing: ['DATABASE_URL'] }, { status: 503 });
 
   const batch = new URL(request.url).searchParams.get('batch');
   const [logs, runs, progress] = await Promise.all([

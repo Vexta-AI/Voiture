@@ -14,6 +14,6 @@ export const maxDuration = 60;
  */
 export async function POST(request: Request) {
   if (!cronAuthorized(request)) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
-  if (!storeEnabled()) return NextResponse.json({ ok: false, error: 'missing_config', missing: ['BLOB_READ_WRITE_TOKEN'] }, { status: 503 });
+  if (!storeEnabled()) return NextResponse.json({ ok: false, error: 'missing_config', missing: ['DATABASE_URL'] }, { status: 503 });
   return NextResponse.json({ ok: true, ...(await sendPendingVerifyAlerts()) });
 }

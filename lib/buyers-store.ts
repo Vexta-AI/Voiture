@@ -1,47 +1,26 @@
 import 'server-only';
 
-import { BlobNotFoundError, del, get, list, put } from '@vercel/blob';
-
 import type { WaitingBuyer } from './crm';
+import { q } from './db';
 
-/** Réseau d'acheteurs dans Vercel Blob (store privé) : crm/buyers/<id>.json. */
-
-const PREFIX = 'crm/buyers/';
-const pathOf = (id: string) => `${PREFIX}${id.replace(/[^a-zA-Z0-9-_]/g, '_')}.json`;
+/** Réseau d'acheteurs dans Neon Postgres : table buyers (id -> acheteur). */
 
 export async function loadBuyer(id: string): Promise<WaitingBuyer | null> {
-  try {
-    const result = await get(pathOf(id), { access: 'private', useCache: false });
-    if (!result || result.statusCode !== 200) return null;
-    return (await new Response(result.stream).json()) as WaitingBuyer;
-  } catch (error) {
-    if (error instanceof BlobNotFoundError) return null;
-    throw error;
-  }
+  return (await q<{ buyer: WaitingBuyer }>(`SELECT buyer FROM buyers WHERE id = $1`, [id]))[0]?.buyer ?? null;
 }
 
 export async function saveBuyer(buyer: WaitingBuyer) {
-  await put(pathOf(buyer.id), JSON.stringify(buyer), { access: 'private', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json' });
+  await q(`INSERT INTO buyers (id, created_at, buyer) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET buyer = excluded.buyer`, [
+    buyer.id,
+    buyer.createdAt,
+    JSON.stringify(buyer),
+  ]);
 }
 
 export async function deleteBuyer(id: string) {
-  await del(pathOf(id)).catch(() => undefined);
+  await q(`DELETE FROM buyers WHERE id = $1`, [id]);
 }
 
 export async function loadBuyers(): Promise<WaitingBuyer[]> {
-  const paths: string[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await list({ prefix: PREFIX, cursor, limit: 1000 });
-    paths.push(...page.blobs.map((b) => b.pathname));
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-  const buyers = await Promise.all(
-    paths.map(async (p) => {
-      const result = await get(p, { access: 'private', useCache: false }).catch(() => null);
-      if (!result || result.statusCode !== 200) return null;
-      return (await new Response(result.stream).json().catch(() => null)) as WaitingBuyer | null;
-    }),
-  );
-  return buyers.filter((b): b is WaitingBuyer => b !== null).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return (await q<{ buyer: WaitingBuyer }>(`SELECT buyer FROM buyers ORDER BY created_at DESC`)).map((r) => r.buyer);
 }

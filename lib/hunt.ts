@@ -3,7 +3,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 
 import { getDatasetItems, getRun, isCapacityError, startRun } from '@/backend/pipeline/apify.js';
-import { priceHistory, repostIndex, withPriceDrop, withRepost } from '@/backend/pipeline/history.js';
+import { withPriceDrop, withRepost } from '@/backend/pipeline/history.js';
 import { ondemandCandidates, priceListings, selectAlerts, selectVerifyAlerts } from '@/backend/pipeline/hunt.js';
 import { filterArea } from '@/backend/pipeline/geo.js';
 import { dedupeById } from '@/backend/pipeline/market.js';
@@ -25,7 +25,9 @@ import {
   loadBatch,
   loadInspections,
   loadOndemand,
-  loadRuns,
+  loadPoolFor,
+  loadRecentRuns,
+  poolSize,
   markAlertSent,
   markOndemand,
   pruneRuns,
@@ -91,7 +93,7 @@ export function missingConfig(config: Config, needs: ('apify' | 'store' | 'inges
   if (needs.includes('apify') && !config.apifyToken) missing.push('APIFY_TOKEN');
   if (needs.includes('ingest') && !config.ingestSecret) missing.push('INGEST_SECRET');
   if (needs.includes('url') && !config.appUrl) missing.push('APP_URL');
-  if (needs.includes('store') && !storeEnabled()) missing.push('BLOB_READ_WRITE_TOKEN');
+  if (needs.includes('store') && !storeEnabled()) missing.push('DATABASE_URL');
   return missing;
 }
 
@@ -246,10 +248,9 @@ async function sendVerifyAlerts(config: Config, priced: ReturnType<typeof priceL
  */
 export async function sendPendingVerifyAlerts() {
   const config = huntConfig();
-  const runs = await loadRuns(HUNT_LIMITS.retentionDays);
-  const pool = dedupeById(runs.flatMap((r) => r.listings));
-  const since = Date.now() - 3 * 86_400_000;
-  const recent = dedupeById(runs.filter((r) => r.kind !== 'market' && new Date(r.fetchedAt).getTime() >= since).flatMap((r) => r.listings));
+  const runs = await loadRecentRuns(3);
+  const recent = dedupeById(runs.filter((r) => r.kind !== 'market').flatMap((r) => r.listings));
+  const pool = dedupeById([...(await loadPoolFor(recent)).listings, ...recent]);
   const area = config.area ?? DEFAULT_AREA;
   const { priced } = priceListings(filterArea(recent, area, { national: true }).kept, pool, { base: area });
   const summary = { verify: 0, alertErrors: 0, crmCreated: 0 };
@@ -314,7 +315,10 @@ export async function ingestRun(runId: string, sourceKey: string, batchId?: stri
   }
 
   const fetchedAt = new Date().toISOString();
+  // Stock lu AVANT d'enregistrer ce run : l'historique de prix et les republications ne comptent que les relevés précédents.
+  const state = await loadPoolFor(listings);
   await saveRun({ runId, source: source.key, kind: source.kind, type: source.type, fetchedAt, listings, rejected });
+  const stock = dedupeById([...state.listings, ...listings]);
 
   const summary = {
     ok: true as const,
@@ -332,15 +336,13 @@ export async function ingestRun(runId: string, sourceKey: string, batchId?: stri
     ondemand: [] as string[],
   };
   const area = config.area ?? DEFAULT_AREA;
-  const pool = () => loadRuns(HUNT_LIMITS.retentionDays).then((runs) => ({ runs, pool: dedupeById(runs.flatMap((r) => r.listings)) }));
 
   if (source.kind === 'market') {
     if (!source.key.startsWith(ONDEMAND_PREFIX) || listings.length === 0) return summary;
     // Comparables arrivés : on recote les annonces fraîches de ces modèles restées sans cote, et on alerte.
     const keys = new Set(listings.map((l) => modelKey(l)));
-    const { runs, pool: stock } = await pool();
-    const since = Date.now() - 3 * 86_400_000;
-    const waiting = dedupeById(runs.filter((r) => r.kind === 'fresh' && new Date(r.fetchedAt).getTime() >= since).flatMap((r) => r.listings)).filter((l) => keys.has(modelKey(l)));
+    const runs = await loadRecentRuns(3);
+    const waiting = dedupeById(runs.filter((r) => r.kind === 'fresh').flatMap((r) => r.listings)).filter((l) => keys.has(modelKey(l)));
     const { priced, unpriced } = priceListings(filterArea(waiting, area, { national: true }).kept, stock, { base: area });
     summary.priced = priced.length;
     summary.unpriced = unpriced;
@@ -353,12 +355,9 @@ export async function ingestRun(runId: string, sourceKey: string, batchId?: stri
   // Mandat (stale) : zone prioritaire uniquement ; achat-revente : France entière, zone prioritaire d'abord.
   const { kept, stats } = filterArea(listings, area, { national: source.kind !== 'stale' });
   Object.assign(summary, { area: stats });
-  const { runs: stored, pool: stock } = await pool();
   // Baisse de prix depuis un relevé précédent : vendeur motivé, nouvelle alerte (la clé d'alerte inclut le prix).
-  const history = priceHistory(stored, { excludeRunId: runId });
   // Annonce supprimée puis republiée : le vrai temps en ligne part de la première annonce.
-  const reposts = repostIndex(stored, { excludeRunId: runId });
-  const tracked = kept.map((l) => withRepost(withPriceDrop(l, history), reposts));
+  const tracked = kept.map((l) => withRepost(withPriceDrop(l, state.history), state.reposts));
   Object.assign(summary, { priceDrops: tracked.filter((l) => 'priceDrop' in l).length, reposts: tracked.filter((l) => 'repost' in l).length });
   const { priced, unpriced, missing } = priceListings(tracked, stock, { base: area });
   summary.priced = priced.length;
@@ -374,14 +373,12 @@ export async function ingestRun(runId: string, sourceKey: string, batchId?: stri
 let liveCache: { at: number; value: Awaited<ReturnType<typeof computeLive>> } | null = null;
 
 async function computeLive() {
-  const runs = await loadRuns(HUNT_LIMITS.retentionDays);
-  const pool = dedupeById(runs.flatMap((r) => r.listings));
-  const recentSince = Date.now() - 3 * 86_400_000;
-  const recentAll = dedupeById(runs.filter((r) => r.kind !== 'market' && new Date(r.fetchedAt).getTime() >= recentSince).flatMap((r) => r.listings));
+  const runs = await loadRecentRuns(3);
+  const recentAll = dedupeById(runs.filter((r) => r.kind !== 'market').flatMap((r) => r.listings));
+  const state = await loadPoolFor(recentAll);
+  const pool = dedupeById([...state.listings, ...recentAll]);
   // Prix actuel = dernier relevé ; baisse = écart avec le plus haut prix déjà vu.
-  const history = priceHistory(runs);
-  const reposts = repostIndex(runs);
-  const recent = filterArea(recentAll, huntConfig().area ?? DEFAULT_AREA).kept.map((l) => withRepost(withPriceDrop(l, history), reposts));
+  const recent = filterArea(recentAll, huntConfig().area ?? DEFAULT_AREA).kept.map((l) => withRepost(withPriceDrop(l, state.history), state.reposts));
   const { priced, unpriced, missing } = priceListings(recent, pool, { base: huntConfig().area ?? DEFAULT_AREA });
   const lastRun = runs.filter((r) => r.kind !== 'market').at(-1)?.fetchedAt ?? null;
   // Annonces réelles encore sans cote : affichées à part (cote à saisir), zone prioritaire d'abord.
@@ -392,7 +389,7 @@ async function computeLive() {
   const listingsOut = priced.map((p) => p.listing as Listing);
   const inspections = await loadInspections<Inspection>(listingsOut.map((l) => l.id)).catch(() => new Map<string, Inspection>());
   const withInspection = listingsOut.map((l) => (inspections.has(l.id) ? { ...l, inspection: inspections.get(l.id) } : l));
-  return { listings: withInspection, pending, unpriced, poolSize: pool.length, lastRun };
+  return { listings: withInspection, pending, unpriced, poolSize: await poolSize().catch(() => pool.length), lastRun };
 }
 
 /** Annonces réelles pour le dashboard (cache 5 min par instance). */
