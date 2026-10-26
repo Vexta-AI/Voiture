@@ -119,5 +119,23 @@ export const DOCUMENTS = {
   ],
 };
 
+/**
+ * Check-list de visite (achat), cochée sur place AVANT de payer. Points tirés du guide de l'utilisateur
+ * (vidéos YouTube de professionnels de l'achat-revente, synthèse Gemini, liens à ajouter) ; HistoVec et CT
+ * de moins de 6 mois sont aussi dans les papiers. Règle d'or : « quand il y a un doute, il n'y a plus de doute ».
+ */
+export const VISIT_CHECKLIST = [
+  { id: 'v_vin', label: 'VIN : identique entre carte grise (case E), pare-brise, frappe à froid et calculateur. Un écart = on part' },
+  { id: 'v_rapport', label: 'Rapport kilométrage / sinistres (HistoVec, et carVertical pour une voiture importée)' },
+  { id: 'v_ct', label: 'CT lu en entier : défaillances majeures et mineures' },
+  { id: 'v_carrosserie', label: 'Carrosserie : même teinte partout, pas de raccord, de mastic ou d’écart de vernis' },
+  { id: 'v_pneus', label: 'Pneus : roues braquées à fond, témoin d’usure, usure symétrique (sinon parallélisme)' },
+  { id: 'v_freins', label: 'Freins : épaisseur de garniture entre étrier et disque' },
+  { id: 'v_entretien', label: 'Carnet et factures : vidanges (boîte comprise), distribution, révisions' },
+  { id: 'v_ligne', label: 'Essai en ligne droite et au freinage : la voiture ne tire ni à gauche ni à droite' },
+  { id: 'v_essai', label: 'Essai sur dos-d’âne et pavés (silent-blocs, amortisseurs) + tous les équipements électroniques' },
+  { id: 'v_doute', label: 'Aucun doute sur l’historique (sinon on n’achète pas, quel que soit le rabais)' },
+];
+
 /** Revente : remise maximale acceptée sur le prix affiché avant de contre-proposer. */
 export const RESALE = { maxDiscountRate: 0.05, step: 50 };

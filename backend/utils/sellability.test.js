@@ -49,3 +49,22 @@ describe('Vendabilité', () => {
     assert.ok(est.criteria.some((c) => /même niveau de finition \(entrée de gamme\)/.test(c)));
   });
 });
+
+import { resaleCompetition } from '../pipeline/hunt.js';
+
+describe('Concurrence à la revente', () => {
+  it('compte les annonces aussi récentes, moins kilométrées et sous le prix de revente', () => {
+    const me = { ...base, id: 'me', title: 'Golf Confortline', price: 9000, mileage: 120000, year: 2016 };
+    const pool = [
+      { ...base, id: 'a', title: 'Golf Confortline', price: 9500, mileage: 90000, year: 2016 }, // moins chère que la revente (10 000), moins de km : concurrente
+      { ...base, id: 'b', title: 'Golf Confortline', price: 9800, mileage: 100000, year: 2017 }, // idem
+      { ...base, id: 'c', title: 'Golf Confortline', price: 9900, mileage: 150000, year: 2016 }, // plus de km : non
+      { ...base, id: 'd', title: 'Golf Confortline', price: 10500, mileage: 80000, year: 2016 }, // plus chère que la revente : non
+      { ...base, id: 'e', title: 'Golf Confortline accidentée', price: 5000, mileage: 50000, year: 2016 }, // accidentée : non
+      { ...base, id: 'f', title: 'Golf Carat', price: 9000, mileage: 60000, year: 2016 }, // autre finition : non
+    ];
+    const c = resaleCompetition(me, pool, 10000);
+    assert.deepEqual(c.samples.map((s) => s.id), ['a', 'b']);
+    assert.equal(c.count, 2);
+  });
+});

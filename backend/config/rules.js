@@ -413,6 +413,8 @@ export const SELLABILITY = {
     atypical: ['rose', 'jaune', 'violet', 'mauve', 'orange', 'vert pomme', 'bicolore', 'covering', 'kit carrosserie'],
   },
   staleRatio: 1.5,
+  /** À partir de 3 annonces moins kilométrées affichées sous ton prix de revente : revente plus dure. Choix métier. */
+  rivalsWarn: 3,
 };
 
 /** 💎 MASTERCLASS : pépite à marge réelle >= 2 x le seuil, sans aucun signal de risque, prix crédible (>= 60 % de la cote). */

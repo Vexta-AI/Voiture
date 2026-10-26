@@ -46,6 +46,8 @@ export interface Listing {
   photos?: string[];
   /** Couleur (attribut LeBonCoin) */
   color?: string;
+  /** Concurrence à la revente : annonces moins kilométrées affichées sous le prix de revente */
+  competition?: { count: number; resalePrice: number; samples: { id: string; title: string; price: number; year: number; mileage: number; url: string | null }[] };
   /** Inspection IA des photos (indicative, jamais une expertise) */
   inspection?: Inspection;
   /** Puissance fiscale (CV) : base de la carte grise */

@@ -9,7 +9,7 @@
  *   - suit l'argent réel : prix d'achat, frais, prix de vente, marge encaissée
  */
 
-import { DOCUMENTS, FOLLOW_UP, HEAT, PIPELINES, RESALE } from '../config/crm.js';
+import { DOCUMENTS, FOLLOW_UP, HEAT, PIPELINES, RESALE, VISIT_CHECKLIST } from '../config/crm.js';
 import { BUSINESS, COSTS, MANDATE, REGISTRATION } from '../config/rules.js';
 import { adUrl } from './links.js';
 import { clamp, normalize } from './text.js';
@@ -613,7 +613,7 @@ export function applyAction(deal, action, now = new Date()) {
       break;
     }
     case 'doc': {
-      const known = DOCUMENTS[deal.kind].some((d) => d.id === action.id);
+      const known = DOCUMENTS[deal.kind].some((d) => d.id === action.id) || (deal.kind === 'achat' && VISIT_CHECKLIST.some((d) => d.id === action.id));
       if (!known) return { ok: false, error: `document inconnu : ${action.id}` };
       next.docs[action.id] = Boolean(action.done);
       break;

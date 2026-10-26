@@ -206,6 +206,8 @@ Chaque deal mené dans le CRM mesure la réalité, à comparer aux hypothèses d
 - **couleur** ;
 - **annonce qui traîne** : en ligne bien plus longtemps que les annonces comparables.
 
+La **concurrence à la revente** compte les annonces du même modèle, aussi récentes et moins kilométrées, déjà affichées sous ton futur prix de revente : ce sont elles que ton acheteur verra à côté de ta voiture (liens sur la carte).
+
 Le prix marché compare désormais des voitures **du même niveau de finition** quand il est connu, pour qu'une Trendline ne soit plus cotée au prix d'une Carat. La vendabilité ne change ni la marge ni le score. La check-list photos ajoute « finition : sellerie, jantes, écran, couleur ».
 
 ## Pépites à vérifier (cote peu fiable)
@@ -263,6 +265,8 @@ Chaque chiffre du radar est soit **sourcé**, soit **un choix métier signalé c
 | Vendabilité : finition | entrée de gamme ⚠, intermédiaire ✓, haute ✓ (surcoût pas toujours récupéré) ; comparables limités au même niveau de finition quand il est connu | « Les modèles d'entrée de gamme seront souvent plus compliqués à revendre à bon prix », « les variantes intermédiaires se retrouvent généralement mieux placées » ([L'argus, 2023](https://www.largus.fr/actualite-automobile/quelles-voitures-francaises-a-essence-decotent-le-plus-30030557.html)) ; liste des finitions par marque = nomenclature constructeur | Sourcé (principe) ; correspondance finition → niveau = choix métier, à compléter |
 | Vendabilité : couleur | noir, gris, blanc ✓ ; rose, jaune, violet, personnalisée ⚠ (aucun montant) | Couleurs les plus vendues et couleurs qui peuvent faire baisser le prix ([Capcar, 2019](https://www.capcar.fr/blog/la-couleur-a-t-elle-une-influence-sur-la-valeur-de-votre-voiture-doccasion), site commercial) ; aucune étude française récente chiffrée | Signal seulement |
 | Vendabilité : annonce qui traîne | en ligne > 1,5 × la médiane des comparables (et ≥ 15 j) | Expérience de l'utilisateur (Golf mal finie, CLA sans toit ouvrant) | Choix métier |
+| Concurrence à la revente | 3 annonces ou plus, même modèle et finition, aussi récentes, moins kilométrées, affichées sous ton prix de revente ⚠ ; recherches LeBonCoin sans plancher de km | Guide de l'utilisateur : « ne jamais borner le kilométrage inférieur » (synthèse Gemini de vidéos YouTube de professionnels, liens des vidéos à ajouter) | Seuil de 3 = choix métier |
+| Check-list de visite (CRM) | 10 points : VIN, rapport km/sinistres, CT, carrosserie, pneus, freins, factures, ligne droite, essai, aucun doute | Même guide ; HistoVec ([officiel](https://histovec.interieur.gouv.fr)) | Expérience pro, à sourcer vidéo par vidéo |
 | Coût de l'inspection IA | tokens × 4 $ / 20 $ par million (entrée / sortie), affiché « estimé » | Tarif Claude Opus 5.5 ([Anthropic, pricing](https://platform.claude.com/docs/en/about-claude/pricing)) ; images limitées à 5 Mo ([Anthropic, vision](https://platform.claude.com/docs/en/build-with-claude/vision)) | Sourcé ; quelques centimes par annonce, à vérifier sur ta console Anthropic |
 | Inspection IA : 6 photos, 0 auto par run, budget 20 $/mois, écart compteur > 5 % et 2 000 km | — | Limites d'usage et seuil d'alerte | Choix métier (réglables dans Vercel) |
 | Check-list photos | 6 points | Points de contrôle courants d'un véhicule d'occasion | Choix métier |

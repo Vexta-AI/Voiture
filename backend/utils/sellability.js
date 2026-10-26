@@ -64,6 +64,13 @@ export function sellability(listing, context = {}) {
     points.push({ tone: 'warn', label: `En ligne depuis ${days} j contre ~${marketDays} j pour les comparables : demande-toi pourquoi elle ne part pas (finition, état, prix)` });
   }
 
+  const rivals = listing.competition;
+  if (rivals && rivals.count >= SELLABILITY.rivalsWarn) {
+    points.push({ tone: 'warn', label: `${rivals.count} annonces du même modèle, aussi récentes et moins kilométrées, affichées sous ton prix de revente (${rivals.resalePrice.toLocaleString('fr-FR')} €) : ton acheteur les verra` });
+  } else if (rivals && rivals.count === 0) {
+    points.push({ tone: 'good', label: 'Aucune annonce moins kilométrée sous ton prix de revente : peu de concurrence directe' });
+  }
+
   const warns = points.filter((p) => p.tone === 'warn').length;
   const goods = points.filter((p) => p.tone === 'good').length;
   const level = warns >= 2 || (trim?.tier === 'entree' && warns > goods) ? 'difficile' : warns > goods ? 'moyenne' : 'facile';
