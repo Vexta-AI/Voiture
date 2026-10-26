@@ -293,7 +293,7 @@ describe('Apify & sources', () => {
     assert.equal(url.origin + url.pathname, 'https://www.leboncoin.fr/recherche');
     assert.equal(url.searchParams.get('category'), '2');
     assert.equal(url.searchParams.get('locations'), `Bordeaux_33000__${DEFAULT_AREA.lat}_${DEFAULT_AREA.lng}_9256_200000`);
-    assert.equal(url.searchParams.get('price'), '3000-30000');
+    assert.equal(url.searchParams.get('price'), '1500-30000');
     assert.equal(new URL(daily[2].input.searchUrl).searchParams.get('category'), '3');
     const weekly = defaultSources({ includeWeekly: true });
     assert.ok(weekly.some((s) => s.key === 'stale-auto') && weekly.some((s) => s.key === 'stale-moto'));
@@ -327,7 +327,7 @@ describe('Comparables à la demande', () => {
       mk('1', 'Seat', 'Ibiza', { zone: 'france', distanceKm: 600 }),
       mk('2', 'Kia', 'Ceed', { zone: 'prioritaire', distanceKm: 50 }),
       mk('3', 'Kia', 'Ceed', { zone: 'prioritaire', distanceKm: 20 }),
-      mk('4', 'Fiat', '500', { zone: 'prioritaire', distanceKm: 10, price: 1500 }), // hors budget
+      mk('4', 'Fiat', '500', { zone: 'prioritaire', distanceKm: 10, price: 1200 }), // hors budget
       mk('5', 'Skoda', 'Fabia', { zone: 'prioritaire', distanceKm: 90 }),
     ];
     const picked = ondemandCandidates(missing, { max: 2 });

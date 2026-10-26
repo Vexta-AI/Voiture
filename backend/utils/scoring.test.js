@@ -215,7 +215,8 @@ describe('Segments & Mandat', () => {
     assert.equal(priceBand(base({ price: 4500 })), 'a1');
     assert.equal(priceBand(base({ price: 6000 })), 'a2');
     assert.equal(priceBand(base({ price: 30000 })), 'a4');
-    assert.equal(priceBand(base({ price: 2500 })), null);
+    assert.equal(priceBand(base({ price: 2500 })), 'a0');
+    assert.equal(priceBand(base({ price: 1200 })), null);
     assert.equal(priceBand(base({ type: 'moto', price: 9000 })), 'm2');
   });
 
@@ -442,5 +443,17 @@ describe('Corrections de cohérence (validées)', () => {
     } finally {
       BUSINESS.status = 'particulier';
     }
+  });
+});
+
+describe('Petits budgets (validé 26/10/2026)', () => {
+  it('remise en état 350 € sous 5 000 €, 500 € au-delà ; objectif 1 000 € NET pour une citadine', () => {
+    const small = score({ price: 4000, marketPrice: 6500 });
+    assert.equal(small.finance.reconditioning, 350);
+    assert.equal(small.finance.netMargin, 6500 - 4000 - 350 - 200);
+    assert.equal(score({ price: 6000, marketPrice: 9000 }).finance.reconditioning, 500);
+    // Le seuil PÉPITE d'une citadine porte sur la marge RÉELLE nette (après carte grise, assurance, annonce).
+    assert.equal(small.threshold, 1000);
+    assert.equal(small.status.key === 'PEPITE', small.finance.realNetMargin > 1000);
   });
 });

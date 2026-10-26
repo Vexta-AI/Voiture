@@ -5,7 +5,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Pépite Radar — Veille & scoring achat-revente Auto/Moto',
   description:
-    "Veille, scoring et aide à la décision pour l'achat-revente et le mandat de recherche Auto & Moto (3 000 € - 30 000 €), Bordeaux & région.",
+    "Veille, scoring et aide à la décision pour l'achat-revente et le mandat de recherche Auto & Moto (1 500 € - 30 000 €), Bordeaux & région.",
 };
 
 export const viewport: Viewport = {

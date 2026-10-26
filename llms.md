@@ -1,11 +1,11 @@
 # Pépite Radar
 
-> Application web de veille, de scoring et d'aide à la décision pour l'achat-revente et le mandat de dépôt-vente de véhicules d'occasion (auto 3 000 € – 30 000 €, moto 5 000 € – 18 000 €), Bordeaux et Nouvelle-Aquitaine.
+> Application web de veille, de scoring et d'aide à la décision pour l'achat-revente et le mandat de dépôt-vente de véhicules d'occasion (auto 1 500 € – 30 000 €, moto 5 000 € – 18 000 €), Bordeaux et Nouvelle-Aquitaine.
 
 ## Ce que fait l'application
 
 - Score chaque annonce de 0 à 100 et lui donne un statut : 🔥 PÉPITE POTENTIELLE, A SURVEILLER ou REFUSE.
-- Calcule la marge nette : prix marché (médiane des annonces comparables) − prix affiché − 500 € de remise en état − 200 € de capital risque, puis la marge réelle (− carte grise à 58 €/CV en Nouvelle-Aquitaine, − assurance temporaire ~6 €/jour, − annonce LeBonCoin 80 €, − trajet ou rapatriement). Les options ne gonflent jamais la marge.
+- Calcule la marge nette : prix marché (médiane des annonces comparables) − prix affiché − 500 € de remise en état (350 € sous 5 000 €) − 200 € de capital risque, puis la marge réelle (− carte grise à 58 €/CV en Nouvelle-Aquitaine, − assurance temporaire ~6 €/jour, − annonce LeBonCoin 80 €, − trajet ou rapatriement). Les options ne gonflent jamais la marge.
 - Refuse les moteurs à risque : Renault 1.2 TCe H5Ft (2012-2018), 1.2 PureTech avant 2023 sans courroie récente, boîte VAG DSG7 à sec DQ200.
 - Repère les options qui valorisent le véhicule (toit panoramique, Pack AMG, S-Line, M-Sport, Tesla Shanghai LFP/Ryzen, Akrapovic, valises BMW…) et les défauts qui servent à négocier (rayures, pneus, plaquettes, jantes).
 - Cible les vendeurs dont l'annonce est en ligne depuis plus de 14 jours pour leur proposer un dépôt-vente sans avance de trésorerie.
