@@ -114,6 +114,8 @@ export function marketConfidence({ comparables, low, high, price, verified, wind
 
 /** Annonce à écarter des comparables : accidentée, en panne, papiers douteux… (prix tiré vers le bas). */
 export function isDamaged(listing) {
+  // Annonce compacte du stock : l'état a été évalué sur l'annonce complète au moment du relevé.
+  if (listing.damaged === true) return true;
   const t = normalize(`${listing.title ?? ''} ${listing.description ?? ''}`);
   return PRICE_SIGNALS.risks.some((r) => findPattern(t, r.pattern));
 }

@@ -1,13 +1,22 @@
 import 'server-only';
 
-import { BlobNotFoundError, BlobPreconditionFailedError, del, get, head, list, put } from '@vercel/blob';
+import { vehicleFingerprint } from '@/backend/pipeline/history.js';
+import { modelKey } from '@/backend/pipeline/market.js';
+import { historyFromPool, mergePoolEntry, repostIndexFromPool, type PoolEntry } from '@/backend/pipeline/pool.js';
 
+import { dbEnabled, q } from './db';
 import type { Listing } from './types';
 
 /**
- * Stockage du radar dans Vercel Blob (store privé).
- *   radar/runs/<date>/<source>-<runId>.json   un fichier par run Apify (jamais réécrit)
- *   radar/alerts/<clé>.json                   marqueur d'alerte déjà envoyée (anti-doublon)
+ * Stockage du radar dans Neon Postgres. Pensé pour l'offre gratuite : chaque passage ne lit que
+ * les annonces utiles (même modèle, même véhicule), jamais tout le stock.
+ *
+ *   runs       runs Apify complets (annonces avec description), gardés 4 jours (alertes, dashboard)
+ *   run_meta   résumé de chaque run sur 90 jours (diagnostic)
+ *   pool       une entrée compacte par annonce vue (comparables + historique de prix), 90 jours
+ *   alerts     alertes déjà envoyées (anti-doublon) ; batches / claims : lots du jour et sources lancées
+ *   logs       derniers retours Apify ; ondemand : recherches de comparables à la demande
+ *   inspections / spend : inspection IA par annonce et dépense du mois
  */
 
 export interface StoredRun {
@@ -20,226 +29,194 @@ export interface StoredRun {
   rejected: number;
 }
 
-const RUNS_PREFIX = 'radar/runs/';
-const ALERTS_PREFIX = 'radar/alerts/';
-const BATCHES_PREFIX = 'radar/batches/';
-const CLAIMS_PREFIX = 'radar/claims/';
-const LOG_PREFIX = 'radar/log/';
-const ONDEMAND_PREFIX = 'radar/ondemand/';
+/** Durée de vie des runs complets : le dashboard et les alertes ne regardent que les 3 derniers jours. */
+const FULL_RUN_DAYS = 4;
+const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 
-export const storeEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+export const storeEnabled = () => dbEnabled();
 
-async function readJson<T>(pathname: string): Promise<T | null> {
-  const result = await get(pathname, { access: 'private', useCache: false });
-  if (!result || result.statusCode !== 200) return null;
-  return (await new Response(result.stream).json()) as T;
-}
-
-async function exists(pathname: string) {
-  try {
-    await head(pathname);
-    return true;
-  } catch (error) {
-    if (error instanceof BlobNotFoundError) return false;
-    throw error;
-  }
-}
-
-async function writeJson(pathname: string, data: unknown, overwrite = false) {
-  await put(pathname, JSON.stringify(data), {
-    access: 'private',
-    addRandomSuffix: false,
-    allowOverwrite: overwrite,
-    contentType: 'application/json',
-  });
-}
-
+/** Enregistre un run : complet pour 4 jours, et chaque annonce fusionnée dans le stock compact. */
 export async function saveRun(run: StoredRun) {
-  const day = run.fetchedAt.slice(0, 10);
-  const safe = (s: string) => s.replace(/[^a-zA-Z0-9-]/g, '_');
-  await writeJson(`${RUNS_PREFIX}${day}/${safe(run.source)}-${safe(run.runId)}.json`, run, true);
+  await q(`INSERT INTO runs (run_id, fetched_at, kind, run) VALUES ($1, $2, $3, $4) ON CONFLICT (run_id) DO UPDATE SET run = excluded.run`, [
+    run.runId,
+    run.fetchedAt,
+    run.kind,
+    JSON.stringify(run),
+  ]);
+  await q(
+    `INSERT INTO run_meta (run_id, fetched_at, source, kind, listings, with_photos) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (run_id) DO NOTHING`,
+    [run.runId, run.fetchedAt, run.source, run.kind, run.listings.length, run.listings.filter((l) => l.photos?.length).length],
+  );
+  const ids = [...new Set(run.listings.map((l) => l.id))];
+  if (!ids.length) return;
+  const previous = new Map(
+    (await q<{ id: string; entry: PoolEntry }>(`SELECT id, entry FROM pool WHERE id = ANY($1)`, [ids])).map((r) => [r.id, r.entry]),
+  );
+  const merged = new Map<string, PoolEntry>();
+  for (const l of run.listings) merged.set(l.id, mergePoolEntry(merged.get(l.id) ?? previous.get(l.id) ?? null, l, run.fetchedAt));
+  const rows = [...merged.values()].map((entry) => ({
+    id: entry.listing.id,
+    modelKey: modelKey(entry.listing),
+    fp: vehicleFingerprint(entry.listing),
+    lastSeen: entry.lastSeenAt,
+    entry,
+  }));
+  await q(
+    `INSERT INTO pool (id, model_key, fingerprint, last_seen, entry)
+     SELECT e->>'id', e->>'modelKey', e->>'fp', (e->>'lastSeen')::timestamptz, e->'entry' FROM jsonb_array_elements($1::jsonb) e
+     ON CONFLICT (id) DO UPDATE SET model_key = excluded.model_key, fingerprint = excluded.fingerprint, last_seen = excluded.last_seen, entry = excluded.entry`,
+    [JSON.stringify(rows)],
+  );
 }
 
-async function listAll(prefix: string) {
-  const blobs: { pathname: string; uploadedAt: Date; url: string }[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await list({ prefix, cursor, limit: 1000 });
-    blobs.push(...page.blobs);
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-  return blobs;
+/** Runs complets des `days` derniers jours (4 au plus), du plus ancien au plus récent. */
+export async function loadRecentRuns(days: number): Promise<StoredRun[]> {
+  const rows = await q<{ run: StoredRun }>(`SELECT run FROM runs WHERE fetched_at >= $1 ORDER BY fetched_at`, [daysAgo(Math.min(days, FULL_RUN_DAYS))]);
+  return rows.map((r) => r.run);
 }
 
-/** Runs des `days` derniers jours, du plus ancien au plus récent. */
-export async function loadRuns(days: number): Promise<StoredRun[]> {
-  const since = Date.now() - days * 86_400_000;
-  const blobs = (await listAll(RUNS_PREFIX)).filter((b) => b.uploadedAt.getTime() >= since);
-  blobs.sort((a, b) => a.uploadedAt.getTime() - b.uploadedAt.getTime());
-  const runs = await Promise.all(blobs.map((b) => readJson<StoredRun>(b.pathname).catch(() => null)));
-  return runs.filter((r): r is StoredRun => r !== null);
+/**
+ * Stock utile à ces annonces : mêmes modèles (comparables, concurrence, revente locale), mêmes annonces
+ * (historique de prix) et mêmes véhicules (annonces republiées). Jamais tout le stock.
+ */
+export async function loadPoolFor(listings: Listing[]) {
+  const keys = [...new Set(listings.map((l) => modelKey(l)))];
+  const ids = [...new Set(listings.map((l) => l.id))];
+  const fps = [...new Set(listings.map((l) => vehicleFingerprint(l)).filter((x): x is string => Boolean(x)))];
+  const entries = keys.length
+    ? (await q<{ entry: PoolEntry }>(`SELECT entry FROM pool WHERE model_key = ANY($1) OR id = ANY($2) OR fingerprint = ANY($3)`, [keys, ids, fps])).map((r) => r.entry)
+    : [];
+  return {
+    listings: entries.map((e) => e.listing as unknown as Listing),
+    history: historyFromPool(entries),
+    reposts: repostIndexFromPool(entries, vehicleFingerprint),
+  };
 }
 
-/** Supprime les runs plus vieux que `days` jours. */
+export async function poolSize() {
+  return Number((await q<{ n: string }>(`SELECT count(*) AS n FROM pool`))[0]?.n ?? 0);
+}
+
+/** Purge : stock et résumés au-delà de `days` jours, runs complets au-delà de 4 jours, journaux et lots anciens. */
 export async function pruneRuns(days: number) {
-  const before = Date.now() - days * 86_400_000;
-  // Runs, journaux, lots, réservations et inspections au-delà de la rétention : supprimés pour garder les lectures légères.
-  // Les marqueurs d'alerte restent (anti-doublon) : ils sont minuscules.
-  const prefixes = [RUNS_PREFIX, LOG_PREFIX, BATCHES_PREFIX, CLAIMS_PREFIX, INSPECTIONS_PREFIX];
-  const old = (await Promise.all(prefixes.map((p) => listAll(p)))).flat().filter((b) => b.uploadedAt.getTime() < before);
-  for (let i = 0; i < old.length; i += 500) await del(old.slice(i, i + 500).map((b) => b.url));
-  return old.length;
+  const removed = await q(`DELETE FROM pool WHERE last_seen < $1 RETURNING id`, [daysAgo(days)]);
+  await q(`DELETE FROM runs WHERE fetched_at < $1`, [daysAgo(FULL_RUN_DAYS)]);
+  await q(`DELETE FROM run_meta WHERE fetched_at < $1`, [daysAgo(days)]);
+  await q(`DELETE FROM batches WHERE created_at < $1`, [daysAgo(3)]);
+  await q(`DELETE FROM claims WHERE batch_id NOT IN (SELECT id FROM batches)`);
+  await q(`DELETE FROM alerts WHERE sent_at < $1`, [daysAgo(180)]);
+  await q(`DELETE FROM ondemand WHERE launched_at < $1`, [daysAgo(60)]);
+  await q(`DELETE FROM logs WHERE id < (SELECT coalesce(max(id), 0) - 300 FROM logs)`);
+  return removed.length;
 }
 
 /** true si l'alerte a déjà été envoyée. */
 export async function alertAlreadySent(key: string) {
-  return exists(`${ALERTS_PREFIX}${key}.json`);
+  return (await q(`SELECT 1 FROM alerts WHERE key = $1`, [key])).length > 0;
+}
+
+export async function markAlertSent(key: string, data: unknown) {
+  await q(`INSERT INTO alerts (key, data) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET sent_at = now(), data = excluded.data`, [key, JSON.stringify(data ?? {})]);
 }
 
 /** Lot de recherches du jour : liste ordonnée des sources à lancer, dans la limite de concurrence Apify. */
 export async function saveBatch(batchId: string, keys: string[]) {
-  await writeJson(`${BATCHES_PREFIX}${batchId}.json`, { batchId, keys, createdAt: new Date().toISOString() }, true);
+  await q(`INSERT INTO batches (id, keys) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET keys = excluded.keys`, [batchId, JSON.stringify(keys)]);
 }
 
 export async function loadBatch(batchId: string) {
-  return readJson<{ batchId: string; keys: string[] }>(`${BATCHES_PREFIX}${batchId}.json`);
+  const row = (await q<{ keys: string[] }>(`SELECT keys FROM batches WHERE id = $1`, [batchId]))[0];
+  return row ? { batchId, keys: row.keys } : null;
 }
 
-const claimPath = (batchId: string, key: string) => `${CLAIMS_PREFIX}${batchId}/${key}.json`;
-
 /**
- * Réserve une source d'un lot (verrou) : la création sans écrasement échoue si le fichier existe,
- * donc deux webhooks simultanés ne peuvent pas lancer la même recherche.
+ * Réserve une source d'un lot (verrou atomique par clé primaire) : deux webhooks simultanés ne lancent
+ * jamais la même recherche.
  * @returns true si la réservation est obtenue
  */
 export async function claimSource(batchId: string, key: string) {
-  try {
-    await writeJson(claimPath(batchId, key), { claimedAt: new Date().toISOString() });
-    return true;
-  } catch (error) {
-    if (await exists(claimPath(batchId, key))) return false;
-    throw error;
-  }
+  return (await q(`INSERT INTO claims (batch_id, key) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING key`, [batchId, key])).length === 1;
 }
 
 /** Libère une réservation (lancement refusé par Apify, à retenter plus tard). */
 export async function releaseSource(batchId: string, key: string) {
-  await del(claimPath(batchId, key)).catch(() => undefined);
+  await q(`DELETE FROM claims WHERE batch_id = $1 AND key = $2`, [batchId, key]);
 }
 
-export async function markAlertSent(key: string, data: unknown) {
-  await writeJson(`${ALERTS_PREFIX}${key}.json`, { sentAt: new Date().toISOString(), ...(data as object) }, true);
-}
-
-/** Journal d'un retour Apify (un fichier par webhook, jamais réécrit). */
+/** Journal d'un retour Apify. */
 export async function logIngest(entry: Record<string, unknown>) {
-  const at = new Date().toISOString();
-  const safe = String(entry.source ?? 'unknown').replace(/[^a-zA-Z0-9-]/g, '_');
-  await writeJson(`${LOG_PREFIX}${at.slice(0, 10)}/${at.replace(/[:.]/g, '-')}-${safe}.json`, { at, ...entry }, true);
+  await q(`INSERT INTO logs (entry) VALUES ($1)`, [JSON.stringify(entry)]);
 }
 
 /** Derniers retours Apify journalisés, du plus récent au plus ancien. */
 export async function recentIngestLogs(limit = 50) {
-  const blobs = (await listAll(LOG_PREFIX)).sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()).slice(0, limit);
-  const logs = await Promise.all(blobs.map((b) => readJson<Record<string, unknown>>(b.pathname).catch(() => null)));
-  return logs.filter((l): l is Record<string, unknown> => l !== null);
+  const rows = await q<{ at: string; entry: Record<string, unknown> }>(`SELECT at, entry FROM logs ORDER BY id DESC LIMIT $1`, [limit]);
+  return rows.map((r) => ({ at: new Date(r.at).toISOString(), ...r.entry }));
 }
 
 /** Avancement d'un lot : sources lancées (réservées) sur le total. */
 export async function batchProgress(batchId: string) {
   const batch = await loadBatch(batchId);
   if (!batch) return null;
-  const claimed = (await listAll(`${CLAIMS_PREFIX}${batchId}/`)).length;
-  return { batchId, total: batch.keys.length, launched: claimed };
+  const launched = Number((await q<{ n: string }>(`SELECT count(*) AS n FROM claims WHERE batch_id = $1`, [batchId]))[0]?.n ?? 0);
+  return { batchId, total: batch.keys.length, launched };
 }
 
-/** Nombre de runs stockés et d'annonces, par source. */
+/** Nombre de runs et d'annonces par source sur `days` jours. */
 export async function runsSummary(days: number) {
-  const runs = await loadRuns(days);
+  const rows = await q<{ source: string; runs: string; listings: string; with_photos: string; last: string }>(
+    `SELECT source, count(*) AS runs, sum(listings) AS listings, sum(with_photos) AS with_photos, max(fetched_at) AS last
+     FROM run_meta WHERE fetched_at >= $1 GROUP BY source`,
+    [daysAgo(days)],
+  );
   const bySource: Record<string, { runs: number; listings: number; withPhotos: number; last: string }> = {};
-  for (const r of runs) {
-    const s = (bySource[r.source] ??= { runs: 0, listings: 0, withPhotos: 0, last: r.fetchedAt });
-    s.runs += 1;
-    s.listings += r.listings.length;
-    s.withPhotos += r.listings.filter((l) => l.photos && l.photos.length > 0).length;
-    if (r.fetchedAt > s.last) s.last = r.fetchedAt;
-  }
+  for (const r of rows) bySource[r.source] = { runs: Number(r.runs), listings: Number(r.listings), withPhotos: Number(r.with_photos), last: new Date(r.last).toISOString() };
   return bySource;
 }
 
 /** Recherche de comparables lancée à la demande : gardée pour l'ingestion et le délai de relance. */
 export async function markOndemand(source: { key: string }) {
-  await writeJson(`${ONDEMAND_PREFIX}${source.key}.json`, { launchedAt: new Date().toISOString(), source }, true);
+  await q(`INSERT INTO ondemand (key, launched_at, source) VALUES ($1, now(), $2) ON CONFLICT (key) DO UPDATE SET launched_at = now(), source = excluded.source`, [
+    source.key,
+    JSON.stringify(source),
+  ]);
 }
 
 export async function loadOndemand<T>(key: string) {
-  return (await readJson<{ source: T }>(`${ONDEMAND_PREFIX}${key}.json`))?.source ?? null;
+  return (await q<{ source: T }>(`SELECT source FROM ondemand WHERE key = $1`, [key]))[0]?.source ?? null;
 }
 
 /** Clés des recherches à la demande lancées depuis moins de `days` jours. */
 export async function recentOndemandKeys(days: number) {
-  const since = Date.now() - days * 86_400_000;
-  return new Set(
-    (await listAll(ONDEMAND_PREFIX)).filter((b) => b.uploadedAt.getTime() >= since).map((b) => b.pathname.slice(ONDEMAND_PREFIX.length).replace(/\.json$/, '')),
-  );
+  return new Set((await q<{ key: string }>(`SELECT key FROM ondemand WHERE launched_at >= $1`, [daysAgo(days)])).map((r) => r.key));
 }
-
-const INSPECTIONS_PREFIX = 'radar/inspections/';
-const INSPECT_SPEND_PREFIX = 'radar/inspect-spend/';
-const safeKey = (s: string) => s.replace(/[^a-zA-Z0-9-]/g, '_');
 
 /** Inspection IA des photos d'une annonce (une par annonce, refaite seulement à la demande). */
 export async function saveInspection(listingId: string, inspection: unknown) {
-  await writeJson(`${INSPECTIONS_PREFIX}${safeKey(listingId)}.json`, inspection, true);
+  await q(`INSERT INTO inspections (listing_id, data) VALUES ($1, $2) ON CONFLICT (listing_id) DO UPDATE SET data = excluded.data`, [listingId, JSON.stringify(inspection)]);
 }
 
 export async function loadInspection<T>(listingId: string) {
-  return readJson<T>(`${INSPECTIONS_PREFIX}${safeKey(listingId)}.json`);
+  return (await q<{ data: T }>(`SELECT data FROM inspections WHERE listing_id = $1`, [listingId]))[0]?.data ?? null;
 }
 
 /** Inspections des annonces demandées (celles qui existent). */
 export async function loadInspections<T>(listingIds: string[]) {
-  const wanted = new Map(listingIds.map((id) => [`${INSPECTIONS_PREFIX}${safeKey(id)}.json`, id]));
-  const blobs = (await listAll(INSPECTIONS_PREFIX)).filter((b) => wanted.has(b.pathname));
   const out = new Map<string, T>();
-  await Promise.all(
-    blobs.map(async (b) => {
-      const value = await readJson<T>(b.pathname).catch(() => null);
-      if (value) out.set(wanted.get(b.pathname) as string, value);
-    }),
-  );
+  if (!listingIds.length) return out;
+  for (const r of await q<{ listing_id: string; data: T }>(`SELECT listing_id, data FROM inspections WHERE listing_id = ANY($1)`, [listingIds])) out.set(r.listing_id, r.data);
   return out;
 }
 
+const month = () => new Date().toISOString().slice(0, 7);
+
 /** Dépense IA du mois (dollars facturés par Anthropic, estimés depuis les tokens). */
-export async function inspectSpend(month = new Date().toISOString().slice(0, 7)) {
-  return (await readJson<{ usd: number; count: number }>(`${INSPECT_SPEND_PREFIX}${month}.json`)) ?? { usd: 0, count: 0 };
+export async function inspectSpend(m = month()) {
+  const row = (await q<{ usd: number; count: number }>(`SELECT usd, count FROM spend WHERE month = $1`, [m]))[0];
+  return { usd: Number(row?.usd ?? 0), count: Number(row?.count ?? 0) };
 }
 
-/** Ajoute une dépense au compteur du mois, en écriture conditionnelle (deux inspections simultanées ne s'écrasent pas). */
-export async function addInspectSpend(usd: number, month = new Date().toISOString().slice(0, 7)) {
-  const pathname = `${INSPECT_SPEND_PREFIX}${month}.json`;
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const result = await get(pathname, { access: 'private', useCache: false }).catch((error) => {
-      if (error instanceof BlobNotFoundError) return null;
-      throw error;
-    });
-    const found = result && result.statusCode === 200;
-    const current = found ? ((await new Response(result.stream).json()) as { usd: number; count: number }) : { usd: 0, count: 0 };
-    const next = JSON.stringify({ usd: Math.round((current.usd + usd) * 10_000) / 10_000, count: current.count + 1 });
-    try {
-      await put(pathname, next, {
-        access: 'private',
-        addRandomSuffix: false,
-        contentType: 'application/json',
-        ...(found ? { ifMatch: result.blob.etag } : { allowOverwrite: false }),
-      });
-      return;
-    } catch (error) {
-      // Quelqu'un a écrit entre-temps (ETag changé, ou fichier créé) : on relit et on recommence.
-      if (error instanceof BlobPreconditionFailedError || (!found && error instanceof Error && /already exists/i.test(error.message))) continue;
-      throw error;
-    }
-  }
-  throw new Error('Compteur de dépense IA : trop d’écritures concurrentes');
+/** Ajoute une dépense au compteur du mois (incrément atomique : deux inspections simultanées ne s'écrasent pas). */
+export async function addInspectSpend(usd: number, m = month()) {
+  await q(`INSERT INTO spend (month, usd, count) VALUES ($1, $2, 1) ON CONFLICT (month) DO UPDATE SET usd = spend.usd + excluded.usd, count = spend.count + 1`, [m, usd]);
 }

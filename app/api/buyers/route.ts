@@ -8,7 +8,7 @@ import { crmEnabled } from '@/lib/crm-store';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const disabled = () => NextResponse.json({ ok: false, error: 'missing_config', missing: ['BLOB_READ_WRITE_TOKEN'] }, { status: 503 });
+const disabled = () => NextResponse.json({ ok: false, error: 'missing_config', missing: ['DATABASE_URL'] }, { status: 503 });
 
 /** GET /api/buyers — réseau d'acheteurs en attente. */
 export async function GET() {

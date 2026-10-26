@@ -20,7 +20,7 @@ Déploiement Vercel : importer le repo, aucun réglage requis. Variables optionn
 | `APIFY_TOKEN` | token Apify : collecte des annonces LeBonCoin |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | alertes PÉPITE / Mandat avec message prêt à copier |
 | `CRON_SECRET` / `INGEST_SECRET` | secrets du cron et du webhook Apify (générés à la création du projet) |
-| `BLOB_READ_WRITE_TOKEN` | stockage Vercel Blob (posé par l'intégration Blob) |
+| `DATABASE_URL` | base Neon Postgres (posée par l'intégration Neon du Vercel Marketplace, offre gratuite : 1 Go, 100 CU-heures et 5 Go de transfert par mois, [neon.com/pricing](https://neon.com/pricing)). Vercel Blob n'est plus utilisé : son offre gratuite (2 000 opérations « avancées » par mois, [Vercel](https://vercel.com/docs/vercel-blob/usage-and-pricing)) a été dépassée le 26/10/2026 et bloque le stockage 30 jours |
 | `HUNT_TYPES` (`auto` ou `auto,moto`), `HUNT_AREA`, `HUNT_MAX_ITEMS`, `HUNT_MARKET_MAX_ITEMS`, `APIFY_MAX_CHARGE_USD`, `HUNT_SOURCES` | réglages de la chasse (optionnels) |
 | `DASHBOARD_PASSWORD` | protège tout le site par mot de passe (identifiant libre) ; `/api/hunt/*` garde ses propres secrets. **Obligatoire en production** : sans lui, le site répond 503 plutôt que d'être ouvert |
 | `ANTHROPIC_API_KEY` | active « Affiner avec l'IA » dans l'éditeur de messages |
@@ -130,7 +130,7 @@ Champs moto : `licenseCategory` (`MTT1` / `MTT2`). Tesla : `vin`. PureTech : `be
 ```
 Cron Vercel (7 h) → /api/hunt/start → runs Apify (LeBonCoin, proxy résidentiel FR, plafond de coût par run)
 Apify (fin de run) → /api/hunt/ingest → relit le run chez Apify → normalise → cote par comparables
-  → scoring → outreach → alerte Telegram (anti-doublon) → stockage Vercel Blob → dashboard en direct
+  → scoring → outreach → alerte Telegram (anti-doublon) → stockage Neon Postgres (stock compact par annonce) → dashboard en direct
 ```
 
 - **Modèles** : le radar scanne tous les véhicules de la zone dans le budget ; les modèles ciblés (top ventes VO : Clio, C3, 208, 2008, Sandero, Captur, Yaris, 308, 3008, Mégane, Duster, Corsa, Polo, Golf, Tesla, Classe A, A3 ; motos : MT-07/09, Z650/800/900, GS, Ténéré 700, T-Max, X-ADV, CB650, Africa Twin, Triumph, SV650) ont en plus des recherches de comparables pour fiabiliser la cote. Ajoutés à la demande de l'utilisateur (modèles revendus par les pros qu'il suit) : 206, 207, Classe B, Smart.
@@ -138,7 +138,7 @@ Apify (fin de run) → /api/hunt/ingest → relit le run chez Apify → normalis
 - **Gammes et budgets** : citadine / compacte / SUV / premium (motos : roadster, trail, maxi-scooter…), tranches 3–6, 6–10, 10–20, 20–30 k€. Filtres du dashboard : zone, gamme, budget, modèles, statut, tri par distance.
 - **Recherches** : `fresh` 3 fois par jour, matin, midi et soir (crons à 5 h, 11 h et 17 h UTC, soit 6 h, 12 h et 18 h à Paris en hiver ; précision ± 59 min sur le plan Hobby, qui limite chaque cron à une exécution par jour, [Vercel](https://vercel.com/docs/cron-jobs/usage-and-pricing)), zone prioritaire puis France entière (dernières annonces, alertes PÉPITE, zone prioritaire en tête) ; chaque lundi, `stale` (annonces les plus anciennes, cibles Mandat J+15) et `market` (recherches larges par modèle, pour la cote).
 - **Cote** : médiane des annonces comparables (même modèle, ±1 an et ±35 % de km, puis ±2 ans et ±60 %), 4 comparables minimum, 10 % d'extrêmes retirés au-delà de 10. Pas assez de comparables = pas de cote = pas d'alerte : aucune marge n'est inventée.
-- **File d'attente** : le plan gratuit Apify limite à 5 runs simultanés. Le cron lance 4 recherches (`APIFY_MAX_CONCURRENT`), puis chaque run terminé lance la suivante du lot. Un verrou dans Blob empêche de lancer deux fois la même recherche.
+- **File d'attente** : le plan gratuit Apify limite à 5 runs simultanés. Le cron lance 4 recherches (`APIFY_MAX_CONCURRENT`), puis chaque run terminé lance la suivante du lot. Un verrou en base (clé unique) empêche de lancer deux fois la même recherche.
 - **Alertes** : 10 max par run, triées par score. Une annonce déjà signalée ne l'est plus, sauf baisse de prix.
 - **Sécurité** : le cron exige `CRON_SECRET`, le webhook exige `INGEST_SECRET`, et seul l'id du run est lu dans le webhook (les annonces sont relues chez Apify avec notre token).
 - **Dashboard privé** : `DASHBOARD_PASSWORD` protège tout le site (y compris l'URL de production courte, que la protection Vercel ne couvre pas). La protection Vercel (connexion à ton compte) reste active sur les autres URLs `*.vercel.app`. Le webhook Apify la traverse grâce au jeton « Protection Bypass for Automation » (variable `VERCEL_AUTOMATION_BYPASS_SECRET`, fournie par Vercel). Pour appeler `/api/outreach` depuis un outil externe, ajoute l'en-tête `x-vercel-protection-bypass: <ce jeton>`.
@@ -171,7 +171,7 @@ Le radar remplit le CRM tout seul : chaque PÉPITE ou cible mandat alertée devi
 - **Argent** : marge attendue, prix d'achat et frais réels, marge encaissée, stock immobilisé, encaissé du mois.
 - **Résumé Telegram** chaque matin avec la chasse : leads chauds, réponses, relances, visites.
 
-Stockage : Vercel Blob (`crm/deals/<id>.json`). API : `GET/POST /api/crm`, `PATCH/DELETE /api/crm/:id` (protégées par le mot de passe du dashboard). L'envoi reste un copier-coller : LeBonCoin n'a pas d'API de messagerie et bannit les envois automatisés.
+Stockage : Neon Postgres (table `deals`). API : `GET/POST /api/crm`, `PATCH/DELETE /api/crm/:id` (protégées par le mot de passe du dashboard). L'envoi reste un copier-coller : LeBonCoin n'a pas d'API de messagerie et bannit les envois automatisés.
 
 ## Réseau d'acheteurs (`/crm` → 👥 Acheteurs)
 

@@ -24,10 +24,11 @@ const STORAGE_KEY = 'pepite-radar:user-listings';
 
 export type RadarInfo =
   | { mode: 'live'; lastRun: string | null; poolSize: number; unpriced: number }
-  | { mode: 'demo'; configured: boolean };
+  | { mode: 'demo'; configured: boolean }
+  | { mode: 'down' };
 
 const TABS: { key: TabKey; label: string; hint: string }[] = [
-  { key: 'auto', label: BUDGETS.auto.label, hint: 'Toutes les voitures de 3 à 30 k€ : Nouvelle-Aquitaine en priorité, puis France entière (rapatriement déduit).' },
+  { key: 'auto', label: BUDGETS.auto.label, hint: 'Toutes les voitures de 1,5 à 30 k€ : Nouvelle-Aquitaine en priorité, puis France entière (rapatriement déduit).' },
   { key: 'moto', label: BUDGETS.moto.label, hint: 'Roadsters, trails et maxi-scooters de 5 à 18 k€ : Nouvelle-Aquitaine en priorité, puis France entière.' },
   { key: 'mandat', label: 'Dépôt-Vente / Mandat (J+15)', hint: 'Annonces de ta zone en ligne depuis plus de 14 jours : sans-stock, zéro trésorerie.' },
 ];
@@ -332,6 +333,13 @@ export function Dashboard({ initialListings, pending = [], radar }: { initialLis
 }
 
 function RadarBanner({ radar }: { radar: RadarInfo }) {
+  if (radar.mode === 'down') {
+    return (
+      <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+        <span className="font-semibold">● Stockage indisponible</span> : le radar n&apos;arrive pas à lire ses données. Aucune annonce affichée (jamais d&apos;annonces fictives en remplacement).
+      </div>
+    );
+  }
   if (radar.mode === 'live') {
     const last = radar.lastRun ? new Date(radar.lastRun).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
     return (

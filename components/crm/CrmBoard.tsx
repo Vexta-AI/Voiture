@@ -161,7 +161,7 @@ export function CrmBoard({ initialDeals, enabled }: { initialDeals: Deal[]; enab
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
         {!enabled && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-            CRM inactif : branche Vercel Blob (BLOB_READ_WRITE_TOKEN) pour enregistrer tes deals.
+            CRM inactif : branche la base Neon Postgres (DATABASE_URL) pour enregistrer tes deals.
           </div>
         )}
         {error && (
