@@ -648,3 +648,120 @@ export const SEASONALITY = {
 
 /** 5 portes : valeur supérieure de 1 000 € à 1 500 € vs 3 portes. */
 export const DOORS_RULE = { preferred: 5, valueGap: [1000, 1500] };
+
+// ---------------------------------------------------------------------------
+// Véhicules importés (USA, Japon, Allemagne / UE) : papiers et coûts cachés
+// ---------------------------------------------------------------------------
+
+/**
+ * Règles par pays d'origine (demande de l'utilisateur le 27/10/2026 : signaler les imports, chiffrer
+ * papiers et démarches, pas de MASTERCLASS tant que la carte grise française n'est pas chiffrée).
+ * Recherche du 27/10/2026. Sources principales :
+ *   Immatriculer un véhicule acheté à l'étranger (COC, attestation, RTI) : https://www.service-public.gouv.fr/particuliers/vosdroits/F20992
+ *   Achat hors UE, 846 A, droits et TVA : https://www.douane.gouv.fr/fiche/achat-dun-vehicule-letranger-ou-dans-un-dom-com
+ *   Dossier RTI DREAL Nouvelle-Aquitaine (CT < 6 mois, UTAC) : https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/IMG/pdf/rti01.2_traduction.pdf
+ *   Malus CO2 d'un import (barème de l'année de 1re immatriculation à l'étranger, décote mensuelle, rien avant 2015) :
+ *     https://www.service-public.gouv.fr/particuliers/vosdroits/F35947 ; malus au poids : https://www.service-public.gouv.fr/particuliers/vosdroits/F35950
+ *   Quitus fiscal (achat dans l'UE) : https://www.impots.gouv.fr/vous-etes-un-particulier-et-vous-souhaitez-obtenir-un-quitus-fiscal
+ * costs : fourchettes de guides commerciaux (estimations, jamais déduites de la marge) ; seule l'homologation
+ * écrite dans l'annonce par le vendeur est déduite.
+ */
+export const IMPORT_RULES = {
+  /** Malus : pas de malus si la 1re immatriculation à l'étranger est antérieure au 01/01/2015 (F35947, F35950). */
+  malusFreeBefore: 2015,
+  /** Plafond 2026 du malus CO2 + poids, avant décote (F35947). Véhicule sans réception UE : barème en CV, 15 CV et plus = 80 000 €. */
+  malusCap: 80000,
+  origins: {
+    usa: {
+      label: 'USA',
+      homologationRequired: true,
+      milesRisk: true,
+      papers: [
+        'Titre américain (Certificate of Title) + facture',
+        'Certificat de dédouanement 846 A (douane : droits + TVA 20 % payés)',
+        'RTI à la DREAL : attestation constructeur de non-conformité, essais UTAC, CT français < 6 mois',
+        'Carte grise ANTS (barème malus en chevaux fiscaux si pas de réception UE)',
+      ],
+      costs: {
+        // Droit de douane : 0 % depuis le 01/07/2026 si fabriquée aux USA et origine prouvée (règlement UE 2026/1455,
+        // https://commission.europa.eu/topics/trade/eu-us-trade-deal_en), sinon 10 % (douane.gouv.fr). À valider dans TARIC.
+        customsRate: { proved: 0, otherwise: 0.1 },
+        vatRate: 0.2,
+        // eplaque « 5 000 à 10 000 € », Matmut « 2 000 € en moyenne » : guides commerciaux, aucun tarif UTAC officiel.
+        homologation: { min: 2000, max: 10000, source: 'guides commerciaux (eplaque, Matmut)' },
+        // Conteneur : 1 100 à 2 200 $ hors frais portuaires (eplaque, WC Shipping), commercial.
+        transport: { min: 1100, max: 2200, currency: 'USD', source: 'transitaires (commercial)' },
+      },
+      sellerQuestions: [
+        'La voiture est-elle déjà en France, dédouanée, avec le certificat 846 A ?',
+        'Le prix est-il « carte grise française en main », malus, homologation et carte grise compris ?',
+        'Le compteur est-il en miles ou en km ? Pouvez-vous m’envoyer le rapport CARFAX avec le VIN ?',
+        'Le titre américain est-il « clean » (pas salvage, rebuilt ou flood) ?',
+      ],
+    },
+    japon: {
+      label: 'Japon',
+      homologationRequired: true,
+      milesRisk: false,
+      papers: [
+        'Certificat d’exportation et de radiation japonais (valable 6 mois, https://www.customs.go.jp/english/c-answer_e/extsukan/5502_e.htm)',
+        'Certificat de dédouanement 846 A (TVA 20 % ; droit 0 % avec preuve d’origine accord UE-Japon, sinon 10 %)',
+        'RTI à la DREAL pour un modèle japonais du marché intérieur (pas de COC UE)',
+        'Volant à droite : autorisé avec phares adaptés (guides commerciaux, à valider DREAL)',
+      ],
+      costs: {
+        // Accord UE-Japon : 0 % en 2026 avec preuve d'origine (https://www.douane.gouv.fr/fiche/accord-de-partenariat-economique-ue-japon), sinon 10 %.
+        customsRate: { proved: 0, otherwise: 0.1 },
+        vatRate: 0.2,
+        homologation: { min: 2000, max: 10000, source: 'guides commerciaux (Matmut, eplaque)' },
+        transport: null,
+      },
+      sellerQuestions: [
+        'La voiture est-elle déjà immatriculée en France ? Sinon, avez-vous le certificat d’exportation et le 846 A ?',
+        'Volant à droite : les phares ont-ils été adaptés à la circulation à droite ?',
+        'Le prix comprend-il l’homologation (RTI), le malus et la carte grise française ?',
+      ],
+    },
+    allemagne: {
+      label: 'Allemagne',
+      homologationRequired: false,
+      milesRisk: false,
+      papers: [
+        'Zulassungsbescheinigung Teil I et Teil II + facture avec le kilométrage',
+        'COC (certificat de conformité), sinon attestation d’identification ou attestation DREAL',
+        'Quitus fiscal : formulaire 1993-PART-D-SD par e-mail au SIE en Gironde',
+        'Plaques valides pour rouler en France (plaques export Ausfuhrkennzeichen ou camion, pas les plaques courtes allemandes)',
+      ],
+      costs: {
+        customsRate: { proved: 0, otherwise: 0 },
+        // Véhicule « neuf » pour la TVA : < 6 mois OU < 6 000 km, TVA française 20 % due (BOFiP BOI-TVA-SECT-70-10).
+        newVehicleVat: { maxMonths: 6, maxKm: 6000, rate: 0.2 },
+        // COC : 180 à 600 € selon la marque (https://autocopilot.fr/guides/importer-voiture-allemagne, commercial).
+        coc: { min: 180, max: 600, source: 'autocopilot (commercial)' },
+        // Camion Allemagne-France : 400 à 900 € (https://motorsactu.com/importer-voiture-allemagne-vers-france-demarches-couts/, commercial).
+        transport: { min: 400, max: 900, currency: 'EUR', source: 'motorsactu (commercial)' },
+      },
+      sellerQuestions: [
+        'Le COC (certificat de conformité) est-il fourni ?',
+        'La voiture a-t-elle déjà sa carte grise française, ou reste-t-il le quitus fiscal et l’immatriculation à faire ?',
+        'Pouvez-vous m’envoyer le Teil II et l’historique d’entretien allemand (Scheckheft) ?',
+      ],
+    },
+    ue: {
+      label: 'Union européenne',
+      homologationRequired: false,
+      milesRisk: false,
+      papers: ['Certificat d’immatriculation étranger + facture', 'COC ou attestation d’identification', 'Quitus fiscal (impots.gouv)'],
+      costs: { customsRate: { proved: 0, otherwise: 0 }, newVehicleVat: { maxMonths: 6, maxKm: 6000, rate: 0.2 } },
+      sellerQuestions: ['Le COC est-il fourni, et la carte grise française est-elle déjà faite ?'],
+    },
+    inconnue: {
+      label: 'étranger (origine à préciser)',
+      homologationRequired: false,
+      milesRisk: false,
+      papers: ['Demander le pays d’origine, le certificat d’immatriculation étranger et le COC (ou 846 A hors UE)'],
+      costs: {},
+      sellerQuestions: ['De quel pays vient la voiture, et la carte grise française est-elle déjà faite ?'],
+    },
+  },
+};

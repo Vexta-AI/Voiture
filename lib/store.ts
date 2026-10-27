@@ -220,3 +220,20 @@ export async function inspectSpend(m = month()) {
 export async function addInspectSpend(usd: number, m = month()) {
   await q(`INSERT INTO spend (month, usd, count) VALUES ($1, $2, 1) ON CONFLICT (month) DO UPDATE SET usd = spend.usd + excluded.usd, count = spend.count + 1`, [m, usd]);
 }
+
+/**
+ * Annonces complètes (description comprise) des runs encore gardés (4 jours), la plus récente par annonce.
+ * Recherche par identifiant ou par texte (titre, description), insensible à la casse.
+ */
+export async function findListings(filter: { id?: string; text?: string }, limit = 10): Promise<(Listing & { fetchedAt: string; source: string })[]> {
+  const text = filter.text ? `%${filter.text.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
+  const rows = await q<{ l: Listing; fetched_at: string; source: string }>(
+    `SELECT DISTINCT ON (l->>'id') l, r.fetched_at, r.run->>'source' AS source
+     FROM runs r, jsonb_array_elements(r.run->'listings') l
+     WHERE ($1::text IS NULL OR l->>'id' = $1) AND ($2::text IS NULL OR (l->>'title') ILIKE $2 OR (l->>'description') ILIKE $2)
+     ORDER BY l->>'id', r.fetched_at DESC
+     LIMIT $3`,
+    [filter.id ?? null, text, limit],
+  );
+  return rows.map((r) => ({ ...r.l, fetchedAt: new Date(r.fetched_at).toISOString(), source: r.source }));
+}

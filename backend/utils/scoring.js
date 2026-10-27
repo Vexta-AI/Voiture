@@ -46,6 +46,8 @@ import {
 } from '../config/rules.js';
 import { distanceKm as gpsDistanceKm } from '../pipeline/geo.js';
 import { offerPriceFor } from './messages.js';
+import { detectImport, importWarning } from './imports.js';
+import { maintenanceSummary } from './maintenance.js';
 import { sellability } from './sellability.js';
 import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplacement } from './text.js';
 
@@ -432,7 +434,10 @@ export function priceReasons(listing, text, online, now = new Date()) {
   const perYear = listing.mileage ? Math.round(listing.mileage / age) : 0;
   if (perYear > PRICE_SIGNALS.highMileagePerYear) reasons.push(`Gros rouleur : ${perYear.toLocaleString('fr-FR')} km/an, la décote est en partie normale.`);
   if (online >= MANDATE.minDaysOnline) reasons.push(`En ligne depuis ${online} jours : vendeur lassé.`);
-  if (/pro/i.test(String(listing.source ?? ''))) reasons.push('Vendeur professionnel : prix souvent déjà travaillé, garantie à exiger.');
+  if (/pro/i.test(String(listing.source ?? ''))) reasons.push(
+      // Garantie légale de conformité, 12 mois de présomption sur une occasion : https://www.service-public.gouv.fr/particuliers/vosdroits/F11094
+      'Vendeur professionnel : prix souvent déjà travaillé. Tu as la garantie légale de conformité, mais ta revente en particulier se fera sans : demande le prix clé en main (frais de dossier, mise en route) et la raison du prix.',
+    );
   for (const r of risks) reasons.push(`⚠️ ${r.label} : « ${r.evidence} ». Le prix bas s'explique peut-être, vérifier avant de bouger.`);
   if (gapRate >= PRICE_SIGNALS.bigGapRate && motivated.length === 0 && risks.length === 0) {
     reasons.push("Aucune raison donnée dans l'annonce : demander au vendeur pourquoi il vend, et regarder les photos de près.");
@@ -525,9 +530,11 @@ export function scoreListing(listing, options = {}) {
   const online = daysOnline(listing, now);
 
   const blacklist = checkBlacklist(listing, text);
+  const imported = listing.type === 'auto' ? detectImport(listing, text) : null;
   const { triggers, bonus: triggersBonus, insights: triggerInsights } = detectTriggers(listing, text);
   const levers = detectLevers(listing, text);
   const warnings = [...blacklist.warnings];
+  if (imported) warnings.push(importWarning(imported));
   const insights = [...triggerInsights];
 
   // --- Formule financière (stricte) ---
@@ -548,7 +555,9 @@ export function scoreListing(listing, options = {}) {
   const ownership = ownershipCosts(listing, geo);
   // Micro : 12,3 % du prix de revente part en cotisations (calculées sur le CA, pas sur la marge).
   const socialCharges = BUSINESS.status === 'micro' ? Math.round(marketPrice * BUSINESS.salesSocialRate) : 0;
-  const purchaseCosts = geo.transportCost + registrationFee + ownership.total + socialCharges;
+  // Import : seule l'homologation écrite par le vendeur est déduite (les autres coûts restent « à chiffrer »).
+  const importCost = imported?.homologationQuoted ?? 0;
+  const purchaseCosts = geo.transportCost + registrationFee + ownership.total + socialCharges + importCost;
   /** Ce qui reste vraiment dans la poche : la base du statut PÉPITE. */
   const realNetMargin = netMargin - purchaseCosts;
 
@@ -616,6 +625,15 @@ export function scoreListing(listing, options = {}) {
   // --- Pourquoi ce prix ? & MASTERCLASS ---
   const why = priceReasons(listing, text, online, now);
   const quality = qualitySignals(text);
+  // « En l'état » / réservé aux pros : information seulement (ni score ni marge, en attente d'accord pour en faire un risque).
+  const asIs = findPattern(text, /vendu(e)? en l'etat|vente en l'etat|prix marchand|reserve(e)? aux (pros|professionnels|marchands)|pour (pro|professionnel|marchand)s?\b|export uniquement/);
+  if (asIs) insights.push(`Annonce « en l'état » ou réservée aux pros (« ${asIs} ») : souvent sans garantie, parfois un défaut non réparé. Demande pourquoi.`);
+  // Fiche entretien du moteur : information seulement (ni score ni marge).
+  const maintenance = listing.type === 'auto' ? maintenanceSummary(listing, text, quality.hits.some((h) => h.id === 'distribution')) : null;
+  if (maintenance) {
+    insights.push(`🔧 ${maintenance.line}.`);
+    if (maintenance.beltDue) insights.push(`🔧 ${Number(listing.mileage).toLocaleString('fr-FR')} km et aucune facture de distribution annoncée : demande-la, sinon prévois le kit dans ton offre.`);
+  }
   if (quality.owners !== null && quality.owners >= 4) warnings.push(`${quality.owners} propriétaires : historique chargé, décote à la revente.`);
   const stats = listing.marketStats;
   const isEv = MARKET_TRUTH.evPattern.test(text);
@@ -653,6 +671,8 @@ export function scoreListing(listing, options = {}) {
   }
   const masterclass =
     status.key === 'PEPITE' &&
+    // Import : papiers et malus pas encore chiffrés, jamais MASTERCLASS.
+    !imported &&
     // MASTERCLASS : seulement sur une cote très fiable.
     (confidence === null || confidence.level === 'haute') &&
     realNetMargin >= threshold * MASTERCLASS.marginMultiplier &&
@@ -693,6 +713,8 @@ export function scoreListing(listing, options = {}) {
     listingId: listing.id,
     status,
     masterclass,
+    imported,
+    maintenance,
     priceReasons: why,
     sellability: sellability(listing, { triggers, daysOnline: online, reliability: warnings.filter((w) => w.startsWith('Fiabilité')) }),
     quality,
@@ -729,6 +751,7 @@ export function scoreListing(listing, options = {}) {
       registrationCost: registrationFee,
       ownership,
       socialCharges,
+      importCost,
       registration,
       realNetMargin,
       reconditioning,
