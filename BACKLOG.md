@@ -25,7 +25,7 @@ Légende : ✅ fait · 🔨 en cours · 🟡 attend ton accord · 💡 idée à 
 
 - ✅ PureTech 1.2 avant 2023 refusé systématiquement. Moteurs à surveiller : THP/Prince, 1.0 EcoBoost, EA111 TSI, BMW N47.
 - ✅ Vendabilité : finition, options, couleur, annonce qui traîne, concurrence à la revente.
-- 🔨 Fiche entretien par moteur : courroie ou chaîne, échéance selon les sources, points faibles, questions au vendeur. Information seulement, sans effet sur le score.
+- ✅ Fiche entretien par moteur (45 moteurs) : courroie ou chaîne, échéance selon les sources, points faibles, questions au vendeur. Information seulement, sans effet sur le score.
 - 🟡 Pas de MASTERCLASS pour une finition d'entrée de gamme, ou une annonce classée « risque de traîner ».
 - 💡 Intervalles constructeur : les confirmer sur les carnets (aujourd'hui, sources secondaires « À valider »).
 - 💡 Crit'Air / ZFE : non intégré tant que les sources se contredisent.

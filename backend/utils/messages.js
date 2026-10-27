@@ -197,7 +197,9 @@ export function generateQualificationMessage(listing, analysis, options = {}) {
     'Pourriez-vous m’envoyer le lien du rapport HistoVec ? (gratuit sur histovec.interieur.gouv.fr, 2 minutes avec la carte grise)',
     analysis.quality?.owners === null || analysis.quality?.owners === undefined ? 'Combien de propriétaires a-t-elle eus ?' : null,
     known.has('factures') || known.has('carnet') ? 'Les factures d’entretien sont-elles disponibles pour la visite ?' : 'Avez-vous les factures d’entretien ?',
-    known.has('distribution') ? null : 'La distribution a-t-elle déjà été faite ? Si oui, à quel kilométrage ?',
+    known.has('distribution') || analysis.maintenance?.sellerQuestions?.length ? null : 'La distribution a-t-elle déjà été faite ? Si oui, à quel kilométrage ?',
+    // Questions propres au moteur (fiche entretien), deux au plus pour garder un message court.
+    ...(analysis.maintenance?.sellerQuestions ?? []).slice(0, 2),
     known.has('ct-ok') ? 'Le contrôle technique a-t-il relevé des défauts mineurs ?' : 'De quand date le dernier contrôle technique, et avec quelles remarques ?',
     ...(analysis.imported?.sellerQuestions ?? []),
     'Y a-t-il des frais à prévoir que vous connaissez ?',

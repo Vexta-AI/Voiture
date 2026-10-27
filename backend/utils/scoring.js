@@ -47,6 +47,7 @@ import {
 import { distanceKm as gpsDistanceKm } from '../pipeline/geo.js';
 import { offerPriceFor } from './messages.js';
 import { detectImport, importWarning } from './imports.js';
+import { maintenanceSummary } from './maintenance.js';
 import { sellability } from './sellability.js';
 import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplacement } from './text.js';
 
@@ -433,7 +434,10 @@ export function priceReasons(listing, text, online, now = new Date()) {
   const perYear = listing.mileage ? Math.round(listing.mileage / age) : 0;
   if (perYear > PRICE_SIGNALS.highMileagePerYear) reasons.push(`Gros rouleur : ${perYear.toLocaleString('fr-FR')} km/an, la décote est en partie normale.`);
   if (online >= MANDATE.minDaysOnline) reasons.push(`En ligne depuis ${online} jours : vendeur lassé.`);
-  if (/pro/i.test(String(listing.source ?? ''))) reasons.push('Vendeur professionnel : prix souvent déjà travaillé, garantie à exiger.');
+  if (/pro/i.test(String(listing.source ?? ''))) reasons.push(
+      // Garantie légale de conformité, 12 mois de présomption sur une occasion : https://www.service-public.gouv.fr/particuliers/vosdroits/F11094
+      'Vendeur professionnel : prix souvent déjà travaillé. Tu as la garantie légale de conformité, mais ta revente en particulier se fera sans : demande le prix clé en main (frais de dossier, mise en route) et la raison du prix.',
+    );
   for (const r of risks) reasons.push(`⚠️ ${r.label} : « ${r.evidence} ». Le prix bas s'explique peut-être, vérifier avant de bouger.`);
   if (gapRate >= PRICE_SIGNALS.bigGapRate && motivated.length === 0 && risks.length === 0) {
     reasons.push("Aucune raison donnée dans l'annonce : demander au vendeur pourquoi il vend, et regarder les photos de près.");
@@ -621,6 +625,15 @@ export function scoreListing(listing, options = {}) {
   // --- Pourquoi ce prix ? & MASTERCLASS ---
   const why = priceReasons(listing, text, online, now);
   const quality = qualitySignals(text);
+  // « En l'état » / réservé aux pros : information seulement (ni score ni marge, en attente d'accord pour en faire un risque).
+  const asIs = findPattern(text, /vendu(e)? en l'etat|vente en l'etat|prix marchand|reserve(e)? aux (pros|professionnels|marchands)|pour (pro|professionnel|marchand)s?\b|export uniquement/);
+  if (asIs) insights.push(`Annonce « en l'état » ou réservée aux pros (« ${asIs} ») : souvent sans garantie, parfois un défaut non réparé. Demande pourquoi.`);
+  // Fiche entretien du moteur : information seulement (ni score ni marge).
+  const maintenance = listing.type === 'auto' ? maintenanceSummary(listing, text, quality.hits.some((h) => h.id === 'distribution')) : null;
+  if (maintenance) {
+    insights.push(`🔧 ${maintenance.line}.`);
+    if (maintenance.beltDue) insights.push(`🔧 ${Number(listing.mileage).toLocaleString('fr-FR')} km et aucune facture de distribution annoncée : demande-la, sinon prévois le kit dans ton offre.`);
+  }
   if (quality.owners !== null && quality.owners >= 4) warnings.push(`${quality.owners} propriétaires : historique chargé, décote à la revente.`);
   const stats = listing.marketStats;
   const isEv = MARKET_TRUTH.evPattern.test(text);
@@ -701,6 +714,7 @@ export function scoreListing(listing, options = {}) {
     status,
     masterclass,
     imported,
+    maintenance,
     priceReasons: why,
     sellability: sellability(listing, { triggers, daysOnline: online, reliability: warnings.filter((w) => w.startsWith('Fiabilité')) }),
     quality,
