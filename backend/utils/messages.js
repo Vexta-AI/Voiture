@@ -199,6 +199,7 @@ export function generateQualificationMessage(listing, analysis, options = {}) {
     known.has('factures') || known.has('carnet') ? 'Les factures d’entretien sont-elles disponibles pour la visite ?' : 'Avez-vous les factures d’entretien ?',
     known.has('distribution') ? null : 'La distribution a-t-elle déjà été faite ? Si oui, à quel kilométrage ?',
     known.has('ct-ok') ? 'Le contrôle technique a-t-il relevé des défauts mineurs ?' : 'De quand date le dernier contrôle technique, et avec quelles remarques ?',
+    ...(analysis.imported?.sellerQuestions ?? []),
     'Y a-t-il des frais à prévoir que vous connaissez ?',
     'Pour quelle raison la vendez-vous ?',
   ].filter(Boolean);

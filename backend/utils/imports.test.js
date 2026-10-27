@@ -5,6 +5,7 @@ import { detectImport, importWarning } from './imports.js';
 import { scoreListing } from './scoring.js';
 
 const corvette = {
+  year: 2005,
   title: 'CHEVROLET CORVETTE C6 – 6.0 V8 LS2 – 404 CH – BVA – 73.278 KM – 2005',
   description:
     "Avant toute acquisition, nous procéderons à nos vérifications habituelles : VIN, CARFAX, cohérence du kilométrage. 🇫🇷 HOMOLOGATION OBLIGATOIRE Cette Chevrolet Corvette étant un modèle d'origine nord-américaine, une procédure d'homologation est nécessaire. Forfait homologation : 4.500 € TTC",
@@ -17,7 +18,7 @@ describe('Véhicules importés', () => {
     assert.equal(imp?.papersPending, true);
     assert.equal(imp?.homologationQuoted, 4500);
     assert.equal(imp?.milesRisk, true);
-    assert.match(importWarning(imp), /homologation annoncée 4.500 €.*miles/);
+    assert.match(importWarning(imp), /homologation annoncée 4.500 €.*malus probablement nul.*miles/);
   });
 
   it('Japon et Allemagne', () => {

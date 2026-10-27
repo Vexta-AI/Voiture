@@ -50,6 +50,8 @@ export function detectImport(listing, text = normalize(`${listing.title ?? ''} $
     /** Montant annoncé par le vendeur lui-même (pas une estimation de l'outil). */
     homologationQuoted: homologationQuoted && homologationQuoted >= 100 && homologationQuoted <= 20000 ? homologationQuoted : null,
     milesRisk: rules.milesRisk || Boolean(findPattern(text, MILES)),
+    /** Malus : rien à payer si la 1re immatriculation (à l'étranger) date d'avant 2015 ; l'année du modèle sert d'indice. */
+    malusFree: Number(listing.year) > 0 && Number(listing.year) < IMPORT_RULES.malusFreeBefore,
     papers: rules.papers,
     costs: rules.costs,
     sellerQuestions: rules.sellerQuestions,
@@ -60,8 +62,16 @@ export function detectImport(listing, text = normalize(`${listing.title ?? ''} $
 export function importWarning(imp) {
   const parts = [`Import ${imp.label}`];
   if (imp.homologationQuoted) parts.push(`homologation annoncée ${imp.homologationQuoted.toLocaleString('fr-FR')} € (déduite de la marge)`);
-  else if (imp.papersPending) parts.push('homologation et carte grise française à chiffrer');
-  parts.push('malus, douane et carte grise non compris dans le prix affiché : exiger un prix « carte grise française en main »');
+  else if (imp.papersPending) {
+    const h = imp.costs?.homologation;
+    parts.push(h ? `homologation à chiffrer (${h.min.toLocaleString('fr-FR')} à ${h.max.toLocaleString('fr-FR')} € selon les guides, travaux en plus)` : 'carte grise française à faire');
+  }
+  parts.push(
+    imp.malusFree
+      ? 'malus probablement nul (1re immatriculation avant 2015, à vérifier sur le titre)'
+      : `malus possible jusqu'à ${IMPORT_RULES.malusCap.toLocaleString('fr-FR')} € avant décote (barème en CV sans réception UE)`,
+  );
+  parts.push('exiger un prix « carte grise française en main »');
   if (imp.milesRisk) parts.push('compteur peut-être en miles (× 1,609)');
   return `${parts.join(' · ')}. Pas de MASTERCLASS tant que les papiers ne sont pas chiffrés.`;
 }
