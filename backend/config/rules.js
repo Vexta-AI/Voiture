@@ -648,3 +648,29 @@ export const SEASONALITY = {
 
 /** 5 portes : valeur supérieure de 1 000 € à 1 500 € vs 3 portes. */
 export const DOORS_RULE = { preferred: 5, valueGap: [1000, 1500] };
+
+// ---------------------------------------------------------------------------
+// Véhicules importés (USA, Japon, Allemagne / UE) : papiers et coûts cachés
+// ---------------------------------------------------------------------------
+
+/**
+ * Règles par pays d'origine (demande de l'utilisateur le 27/10/2026 : signaler les imports, chiffrer
+ * papiers et démarches, pas de MASTERCLASS tant que la carte grise française n'est pas chiffrée).
+ * costs : montants sourcés uniquement, sinon null (« À valider ») : l'outil n'invente pas de coût.
+ */
+export const IMPORT_RULES = {
+  origins: {
+    usa: {
+      label: 'USA',
+      homologationRequired: true,
+      milesRisk: true,
+      papers: [],
+      costs: {},
+      sellerQuestions: [],
+    },
+    japon: { label: 'Japon', homologationRequired: true, milesRisk: false, papers: [], costs: {}, sellerQuestions: [] },
+    allemagne: { label: 'Allemagne', homologationRequired: false, milesRisk: false, papers: [], costs: {}, sellerQuestions: [] },
+    ue: { label: 'Union européenne', homologationRequired: false, milesRisk: false, papers: [], costs: {}, sellerQuestions: [] },
+    inconnue: { label: 'étranger (origine à préciser)', homologationRequired: false, milesRisk: false, papers: [], costs: {}, sellerQuestions: [] },
+  },
+};

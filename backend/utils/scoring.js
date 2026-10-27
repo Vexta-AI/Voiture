@@ -46,6 +46,7 @@ import {
 } from '../config/rules.js';
 import { distanceKm as gpsDistanceKm } from '../pipeline/geo.js';
 import { offerPriceFor } from './messages.js';
+import { detectImport, importWarning } from './imports.js';
 import { sellability } from './sellability.js';
 import { clamp, compact, findAnyKeyword, findPattern, normalize, parseDisplacement } from './text.js';
 
@@ -525,9 +526,11 @@ export function scoreListing(listing, options = {}) {
   const online = daysOnline(listing, now);
 
   const blacklist = checkBlacklist(listing, text);
+  const imported = listing.type === 'auto' ? detectImport(listing, text) : null;
   const { triggers, bonus: triggersBonus, insights: triggerInsights } = detectTriggers(listing, text);
   const levers = detectLevers(listing, text);
   const warnings = [...blacklist.warnings];
+  if (imported) warnings.push(importWarning(imported));
   const insights = [...triggerInsights];
 
   // --- Formule financière (stricte) ---
@@ -548,7 +551,9 @@ export function scoreListing(listing, options = {}) {
   const ownership = ownershipCosts(listing, geo);
   // Micro : 12,3 % du prix de revente part en cotisations (calculées sur le CA, pas sur la marge).
   const socialCharges = BUSINESS.status === 'micro' ? Math.round(marketPrice * BUSINESS.salesSocialRate) : 0;
-  const purchaseCosts = geo.transportCost + registrationFee + ownership.total + socialCharges;
+  // Import : seule l'homologation écrite par le vendeur est déduite (les autres coûts restent « à chiffrer »).
+  const importCost = imported?.homologationQuoted ?? 0;
+  const purchaseCosts = geo.transportCost + registrationFee + ownership.total + socialCharges + importCost;
   /** Ce qui reste vraiment dans la poche : la base du statut PÉPITE. */
   const realNetMargin = netMargin - purchaseCosts;
 
@@ -653,6 +658,8 @@ export function scoreListing(listing, options = {}) {
   }
   const masterclass =
     status.key === 'PEPITE' &&
+    // Import : papiers et malus pas encore chiffrés, jamais MASTERCLASS.
+    !imported &&
     // MASTERCLASS : seulement sur une cote très fiable.
     (confidence === null || confidence.level === 'haute') &&
     realNetMargin >= threshold * MASTERCLASS.marginMultiplier &&
@@ -693,6 +700,7 @@ export function scoreListing(listing, options = {}) {
     listingId: listing.id,
     status,
     masterclass,
+    imported,
     priceReasons: why,
     sellability: sellability(listing, { triggers, daysOnline: online, reliability: warnings.filter((w) => w.startsWith('Fiabilité')) }),
     quality,
@@ -729,6 +737,7 @@ export function scoreListing(listing, options = {}) {
       registrationCost: registrationFee,
       ownership,
       socialCharges,
+      importCost,
       registration,
       realNetMargin,
       reconditioning,
