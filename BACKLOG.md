@@ -17,8 +17,9 @@ Légende : ✅ fait · 🔨 en cours · 🟡 attend ton accord · 💡 idée à 
 
 - ✅ Marge calculée en particulier (`BUSINESS.status = 'particulier'`). Dire « passe en micro » une fois l'activité déclarée.
 - ✅ Objectif 1 000 € **net** (pas brut). Budget à partir de 1 500 €, remise en état 350 € sous 5 000 €.
-- 🟡 Nouveaux leviers de négociation : débosselage sans peinture (≈ 80 € réel), disques (≈ 300 €), jante unie (70 € HT).
-- 🟡 Offre « sous 24 h » dans le message de négociation.
+- ✅ Nouveaux leviers : débosselage sans peinture (−300 €, coût 80 €), disques + plaquettes (−400 €, coût 300 €).
+- 💡 Jante unie à 70 € HT : le type de jante (unie ou bi-ton) ne se lit pas dans l'annonce, on garde 170 € (prudent).
+- ✅ Offre « sous 24 h » dans les messages.
 - ✅ Cote sur les **particuliers** seulement quand ils sont assez nombreux (sinon pros inclus, et c'est écrit dans les critères).
 - 💡 Même règle pour la revente « chez toi » (rayon 100/200 km).
 
