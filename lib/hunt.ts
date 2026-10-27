@@ -327,6 +327,10 @@ export async function ingestRun(runId: string, sourceKey: string, batchId?: stri
     items: items.length,
     listings: listings.length,
     rejected,
+    // Diagnostic : combien d'annonces arrivent avec leur description (le texte sert aux défauts, imports, factures).
+    withDescription: listings.filter((l) => l.description).length,
+    // Noms des champs renvoyés par le scraper (jamais les valeurs), pour repérer un champ renommé.
+    rawFields: items[0] ? Object.keys(items[0]).sort().slice(0, 80) : [],
     priced: 0,
     unpriced: 0,
     alerts: 0,

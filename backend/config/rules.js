@@ -549,8 +549,18 @@ export const NEGOTIATION_LEVERS = [
     label: 'Calandre / pare-choc / élément à repeindre',
     discount: 500,
     realCost: 200,
-    keywords: ['pare-choc abime', 'pare choc abime', 'pare-choc a repeindre', 'pare choc a repeindre', 'calandre cassee', 'calandre abimee', 'calandre fendue', 'element a repeindre', 'bosse', 'petit choc', 'enfoncement', 'peinture ecaillee', 'vernis'],
+    keywords: ['pare-choc abime', 'pare choc abime', 'pare-choc a repeindre', 'pare choc a repeindre', 'calandre cassee', 'calandre abimee', 'calandre fendue', 'element a repeindre', 'petit choc', 'peinture ecaillee', 'vernis'],
     argument: "peinture d'élément à 200 € + dépose/repose chez le carrossier",
+  },
+  {
+    // Débosselage sans peinture : 50 à 80 € par impact (guide « Cursus achat-revente » fourni par l'utilisateur,
+    // source professionnelle non officielle). Négo −300 € : choix métier validé par l'utilisateur le 27/10/2026.
+    id: 'dsp',
+    label: 'Petite bosse (débosselage sans peinture)',
+    discount: 300,
+    realCost: 80,
+    keywords: ['petite bosse', 'bosse', 'bosses', 'enfoncement', 'petit enfoncement', 'impact de grele', 'grele', 'coup de portiere'],
+    argument: 'débosselage sans peinture à 50-80 € par impact, sans repeindre',
   },
   {
     id: 'pneus',
@@ -565,8 +575,18 @@ export const NEGOTIATION_LEVERS = [
     label: 'Plaquettes / freins à prévoir',
     discount: 150,
     realCost: 60,
-    keywords: ['plaquettes a prevoir', 'plaquettes a changer', 'freins a prevoir', 'disques et plaquettes', 'plaquettes usees', 'plaquettes en fin de vie'],
+    keywords: ['plaquettes a prevoir', 'plaquettes a changer', 'freins a prevoir', 'plaquettes usees', 'plaquettes en fin de vie'],
     argument: 'kit plaquettes Autodoc + montage en indépendant',
+  },
+  {
+    // Plaquettes + disques : 200 à 500 € (guide « Cursus achat-revente » fourni par l'utilisateur, source pro non officielle) ;
+    // coût réel ~300 € retenu au milieu de la fourchette. Négo −400 € : choix métier validé le 27/10/2026.
+    id: 'disques',
+    label: 'Disques + plaquettes à prévoir',
+    discount: 400,
+    realCost: 300,
+    keywords: ['disques et plaquettes', 'disques a prevoir', 'disques a changer', 'disques uses', 'disques voiles', 'disques de frein a prevoir'],
+    argument: 'disques + plaquettes en indépendant, 200 à 500 € selon le véhicule',
   },
   {
     id: 'jantes',

@@ -390,7 +390,7 @@ export function suggestReply(deal, inbound) {
   if (inbound.intent === 'refus') {
     return { text: `Je comprends tout à fait. Mon offre de ${eur(offer)} reste valable cette semaine : paiement immédiat, sans curieux ni rendez-vous manqués. N’hésitez pas à revenir vers moi.` };
   }
-  return { text: `Bonjour, bien sûr ! [ta réponse ici] Je suis acheteur sérieux sur la région, je paie par virement instantané et je me déplace sous 48 h. Mon offre de ${eur(offer)} tient toujours : on cale une visite ?` };
+  return { text: `Bonjour, bien sûr ! [ta réponse ici] Je suis acheteur sérieux sur la région, je paie par virement instantané et je me déplace sous 24 h. Mon offre de ${eur(offer)} tient toujours : on cale une visite ?` };
 }
 
 /** Relance n°1 ou n°2 après un silence. */
