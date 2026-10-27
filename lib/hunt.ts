@@ -7,12 +7,12 @@ import { withPriceDrop, withRepost } from '@/backend/pipeline/history.js';
 import { ondemandCandidates, priceListings, selectAlerts, selectVerifyAlerts } from '@/backend/pipeline/hunt.js';
 import { filterArea } from '@/backend/pipeline/geo.js';
 import { dedupeById } from '@/backend/pipeline/market.js';
-import { normalizeApifyItem } from '@/backend/pipeline/normalize.js';
+import { detailsFromItem, normalizeApifyItem } from '@/backend/pipeline/normalize.js';
 import { formatTelegramAlert, formatVerifyAlert, sendTelegram } from '@/backend/pipeline/telegram.js';
 import { INSPECTION } from '@/backend/utils/inspection.js';
 import { dailyDigest } from '@/backend/utils/crm.js';
 import { matchBuyers } from '@/backend/utils/matching.js';
-import { DEFAULT_AREA, HUNT_LIMITS, ONDEMAND_PREFIX, defaultSources, parseArea, parseTypes, type HuntSource } from '@/backend/config/sources.js';
+import { DEFAULT_AREA, DETAILS_ACTOR_ID, DETAILS_PREFIX, HUNT_LIMITS, ONDEMAND_PREFIX, defaultSources, parseArea, parseTypes, type HuntSource } from '@/backend/config/sources.js';
 import { modelKey } from '@/backend/pipeline/market.js';
 
 import { loadBuyers } from './buyers-store';
@@ -34,8 +34,10 @@ import {
   recentOndemandKeys,
   releaseSource,
   saveBatch,
+  saveDetails,
   saveRun,
   storeEnabled,
+  withDetails,
 } from './store';
 import type { Inspection, Listing } from './types';
 
@@ -292,8 +294,58 @@ async function launchOndemand(config: Config, missing: Listing[], batchId?: stri
 
 /** Source d'un run : lot du jour, ou recherche de comparables à la demande. */
 async function sourceByKey(config: Config, key: string): Promise<HuntSource | undefined> {
-  if (key.startsWith(ONDEMAND_PREFIX)) return (await loadOndemand<HuntSource>(key)) ?? undefined;
+  if (key.startsWith(ONDEMAND_PREFIX) || key.startsWith(DETAILS_PREFIX)) return (await loadOndemand<HuntSource>(key)) ?? undefined;
   return resolveSources(config, true).find((s) => s.key === key);
+}
+
+type Priced = ReturnType<typeof priceListings>['priced'];
+type AlertSummary = Parameters<typeof alertOn>[2];
+
+/**
+ * Alertes après lecture de la vraie description : les pages de résultats leboncoin n'ont pas le texte du vendeur.
+ * Les annonces qui vont partir en alerte sont lues en entier (scraper de détails) et alertées au retour du run ;
+ * sans créneau Apify, l'alerte part tout de suite, sur le titre.
+ */
+async function alertWithDetails(config: Config, priced: Priced, summary: AlertSummary & { details?: number }, batchId?: string) {
+  const withText = await withDetails(priced.map((p) => p.listing as Listing));
+  priced.forEach((p, i) => Object.assign(p, { listing: withText[i] }));
+  const max = Number(process.env.HUNT_DETAILS_PER_RUN ?? HUNT_LIMITS.detailsPerRun);
+  const candidateIds = new Set([...selectAlerts(priced), ...selectVerifyAlerts(priced)].map((a) => a.listing.id));
+  const toRead = priced.filter((p) => candidateIds.has(p.listing.id) && !p.listing.description && /^lbc-\d+$/.test(p.listing.id)).slice(0, Math.max(0, max));
+  let held = new Set<string>();
+  if (toRead.length && config.apifyToken) {
+    const source = {
+      key: `${DETAILS_PREFIX}${Date.now().toString(36)}-${randomUUID().slice(0, 6)}`,
+      kind: 'details' as const,
+      type: 'auto' as const,
+      actorId: DETAILS_ACTOR_ID,
+      input: { urls: toRead.map((p) => p.listing.url ?? `https://www.leboncoin.fr/ad/voitures/${p.listing.id.slice(4)}`), maxItems: toRead.length },
+      held: toRead,
+    };
+    try {
+      await markOndemand(source);
+      await startRun({ token: config.apifyToken, source, webhookUrl: `${config.appUrl}/api/hunt/ingest`, webhookSecret: config.ingestSecret, maxChargeUsd: config.maxChargeUsd, bypassSecret: config.bypassSecret, batchId });
+      held = new Set(toRead.map((p) => p.listing.id));
+      summary.details = held.size;
+    } catch (error) {
+      // Pas de créneau ou scraper indisponible : on alerte sur le titre plutôt que de rater la pépite.
+      if (!isCapacityError(error)) console.error('[hunt] details', error);
+    }
+  }
+  await alertOn(config, priced.filter((p) => !held.has(p.listing.id)), summary);
+}
+
+/** Retour du scraper de détails : descriptions enregistrées, puis alertes des annonces mises en attente. */
+async function ingestDetails(config: Config, source: HuntSource, items: Record<string, unknown>[], summary: AlertSummary & Record<string, unknown>) {
+  const rows = items.map((item) => detailsFromItem(item)).filter((r): r is { id: string; description: string } => r !== null);
+  await saveDetails(rows);
+  Object.assign(summary, { withDescription: rows.length, rawFields: items[0] ? Object.keys(items[0]).sort().slice(0, 80) : [] });
+  const held = (source.held ?? []) as Priced;
+  const byId = new Map(rows.map((r) => [r.id, r.description]));
+  for (const p of held) if (!p.listing.description && byId.has(p.listing.id)) Object.assign(p, { listing: { ...p.listing, description: byId.get(p.listing.id) } });
+  summary.priced = held.length;
+  await alertOn(config, held, summary);
+  return summary;
 }
 
 /** Traite un run Apify terminé : stockage, cote, scoring, alertes Telegram, comparables manquants. */
@@ -306,6 +358,10 @@ export async function ingestRun(runId: string, sourceKey: string, batchId?: stri
   if (run.status !== 'SUCCEEDED') return { ok: false as const, error: 'run_not_succeeded', status: run.status };
 
   const items: Record<string, unknown>[] = await getDatasetItems({ token: config.apifyToken, datasetId: run.datasetId });
+  if (source.kind === 'details') {
+    const base = { ok: true as const, source: source.key, kind: source.kind, items: items.length, priced: 0, alerts: 0, skippedDuplicates: 0, alertErrors: 0, crmCreated: 0 };
+    return ingestDetails(config, source, items, base);
+  }
   const listings: Listing[] = [];
   let rejected = 0;
   for (const item of items) {
@@ -350,7 +406,7 @@ export async function ingestRun(runId: string, sourceKey: string, batchId?: stri
     const { priced, unpriced } = priceListings(filterArea(waiting, area, { national: true }).kept, stock, { base: area });
     summary.priced = priced.length;
     summary.unpriced = unpriced;
-    await alertOn(config, priced, summary);
+    await alertWithDetails(config, priced, summary, batchId);
     return summary;
   }
 
@@ -366,7 +422,7 @@ export async function ingestRun(runId: string, sourceKey: string, batchId?: stri
   const { priced, unpriced, missing } = priceListings(tracked, stock, { base: area });
   summary.priced = priced.length;
   summary.unpriced = unpriced;
-  await alertOn(config, priced, summary);
+  await alertWithDetails(config, priced, summary, batchId);
   summary.ondemand = await launchOndemand(config, missing as Listing[], batchId).catch((error) => {
     console.error('[hunt] ondemand', error);
     return [];
@@ -378,7 +434,7 @@ let liveCache: { at: number; value: Awaited<ReturnType<typeof computeLive>> } | 
 
 async function computeLive() {
   const runs = await loadRecentRuns(3);
-  const recentAll = dedupeById(runs.filter((r) => r.kind !== 'market').flatMap((r) => r.listings));
+  const recentAll = await withDetails(dedupeById(runs.filter((r) => r.kind !== 'market').flatMap((r) => r.listings)));
   const state = await loadPoolFor(recentAll);
   const pool = dedupeById([...state.listings, ...recentAll]);
   // Prix actuel = dernier relevé ; baisse = écart avec le plus haut prix déjà vu.

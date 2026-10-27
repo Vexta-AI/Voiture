@@ -42,7 +42,19 @@ export const HUNT_LIMITS = {
   ondemandPerRun: 2,
   /** Un modèle déjà recherché à la demande n'est pas relancé avant ce délai. */
   ondemandCooldownDays: 14,
+  /**
+   * Pages complètes lues par run (description du vendeur) : les pages de résultats leboncoin n'ont plus le texte.
+   * Seulement les annonces qui vont partir en alerte. Choix métier, réglable par HUNT_DETAILS_PER_RUN.
+   */
+  detailsPerRun: 10,
 };
+
+/**
+ * Scraper de pages d'annonce (description complète) : ~0,0009 $ par annonce, proxy résidentiel inclus
+ * (https://apify.com/silentflow/leboncoin-details-scraper-ppr, tarif lu le 27/10/2026).
+ */
+export const DETAILS_ACTOR_ID = 'silentflow~leboncoin-details-scraper-ppr';
+export const DETAILS_PREFIX = 'details-';
 
 /** Mots-clés des recherches de comparables, un par modèle ciblé. */
 const MARKET_QUERIES = {
@@ -111,9 +123,11 @@ function lbcSearchUrl({ type, area, order }) {
 /**
  * @typedef {Object} HuntSource
  * @property {string} key       identifiant stable (transmis dans le webhook)
- * @property {'fresh'|'stale'|'market'} kind
+ * @property {'fresh'|'stale'|'market'|'details'} kind
  * @property {'auto'|'moto'} type
  * @property {Record<string, unknown>} input  input du scraper (hors proxy)
+ * @property {string} [actorId]  autre scraper que celui des recherches (pages d'annonce)
+ * @property {{ listing: Record<string, any>, market: Record<string, any> }[]} [held]  annonces cotées en attente de leur description
  */
 
 /** "auto" / "auto,moto" -> types chassés ; null si vide ou invalide. */
@@ -209,6 +223,8 @@ export function ondemandSource(listing, options = {}) {
 
 /** Input complet envoyé au scraper (proxy résidentiel FR obligatoire pour LeBonCoin). */
 export function actorInput(source) {
+  // Le scraper de pages d'annonce gère lui-même son proxy.
+  if (source.kind === 'details') return source.input;
   return {
     ownerType: 'all',
     ...source.input,

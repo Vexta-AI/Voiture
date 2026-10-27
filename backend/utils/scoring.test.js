@@ -373,6 +373,18 @@ describe('Pourquoi ce prix ? / MASTERCLASS', () => {
     assert.ok(a.warnings.some((w) => w.includes('Accident')));
   });
 
+  it('vendu en l’état : un risque, jamais MASTERCLASS', () => {
+    const a = score({ price: 6000, marketPrice: 10000, description: 'Vendue en l’état, prix marchand.' });
+    assert.equal(a.masterclass, false);
+    assert.ok(a.priceReasons.risks.some((r) => r.id === 'etat'));
+  });
+
+  it('finition d’entrée de gamme : jamais MASTERCLASS', () => {
+    const a = score({ price: 6000, marketPrice: 10000, brand: 'Volkswagen', model: 'Golf 7', title: 'Volkswagen Golf 7 1.6 TDI Trendline', description: 'Vente urgente cause départ à l’étranger.' });
+    assert.equal(a.sellability.trim?.tier, 'entree');
+    assert.equal(a.masterclass, false);
+  });
+
   it('les négations ne comptent pas (« aucun accident »)', () => {
     const a = score({ price: 6000, marketPrice: 10000, description: 'Aucun accident, carnet complet.' });
     assert.equal(a.priceReasons.risks.length, 0);

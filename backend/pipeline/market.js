@@ -112,6 +112,9 @@ export function marketConfidence({ comparables, low, high, price, verified, wind
   return { score, level: /** @type {'haute'|'moyenne'|'faible'} */ (level), spreadPct: Math.round(spread * 100) };
 }
 
+/** Annonce d'un vendeur professionnel (source « LeBonCoin · Pro »). */
+export const isProSeller = (listing) => /\bpro\b/i.test(String(listing.source ?? ''));
+
 /** Annonce à écarter des comparables : accidentée, en panne, papiers douteux… (prix tiré vers le bas). */
 export function isDamaged(listing) {
   // Annonce compacte du stock : l'état a été évalué sur l'annonce complète au moment du relevé.
@@ -146,7 +149,7 @@ export function estimateMarketPrice(listing, pool, minComparables = MARKET_RULES
 
   for (const w of MARKET_RULES.windows) {
     const tolerance = Math.max(w.mileageFloor, listing.mileage * w.mileageRatio);
-    const comps = healthy.filter((p) => {
+    let comps = healthy.filter((p) => {
       if (Math.abs(p.year - listing.year) > w.years) return false;
       if (listing.mileage && p.mileage && Math.abs(p.mileage - listing.mileage) > tolerance) return false;
       // Motorisation : même carburant, même boîte, puissance proche (quand l'info existe des deux côtés).
@@ -161,6 +164,19 @@ export function estimateMarketPrice(listing, pool, minComparables = MARKET_RULES
       return true;
     });
     if (comps.length < minComparables) continue;
+    // Revente en particulier : un pro vend plus cher (garantie incluse). La cote prend les particuliers seuls
+    // quand ils suffisent (accord de l'utilisateur le 27/10/2026), sinon tout le monde, et le dit.
+    const privateComps = comps.filter((p) => !isProSeller(p));
+    const prosExcluded = comps.length - privateComps.length;
+    const sellerCriterion =
+      privateComps.length >= minComparables
+        ? prosExcluded > 0
+          ? [`particuliers seulement (${prosExcluded} pro(s) écarté(s))`]
+          : []
+        : prosExcluded > 0
+          ? ['pros inclus (pas assez d’annonces de particuliers)']
+          : [];
+    if (privateComps.length >= minComparables) comps = privateComps;
     const criteria = [
       fuel ? `même carburant (${fuel})` : 'carburant non vérifié',
       gearbox ? `même boîte (${gearbox})` : 'boîte non vérifiée',
@@ -169,6 +185,7 @@ export function estimateMarketPrice(listing, pool, minComparables = MARKET_RULES
       `année ±${w.years}`,
       listing.mileage ? `km ±${Math.round(tolerance / 1000)} 000` : 'km non vérifié',
       ...(damagedExcluded > 0 ? [`${damagedExcluded} annonce(s) accidentée(s) / en panne écartée(s)`] : []),
+      ...sellerCriterion,
     ];
 
     let prices = comps.map((p) => p.price).sort((a, b) => a - b);
