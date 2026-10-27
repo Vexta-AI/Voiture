@@ -85,7 +85,7 @@ export function generateNegotiationMessage(listing, analysis, options = {}) {
   lines.push('');
   lines.push(
     `Votre ${name} de ${listing.year} (${listing.mileage.toLocaleString('fr-FR')} km) m’intéresse et je peux conclure très vite : ` +
-      'paiement immédiat par virement instantané (fonds reçus en quelques secondes) et déplacement sous 48 h sur le secteur.',
+      'paiement immédiat par virement instantané (fonds reçus en quelques secondes) et déplacement sous 24 h sur le secteur.',
   );
   lines.push('');
 
