@@ -28,6 +28,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS inspections (listing_id text PRIMARY KEY, data jsonb NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS spend (month text PRIMARY KEY, usd double precision NOT NULL DEFAULT 0, count int NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS deals (id text PRIMARY KEY, updated_at timestamptz NOT NULL, deal jsonb NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS details (listing_id text PRIMARY KEY, fetched_at timestamptz NOT NULL DEFAULT now(), data jsonb NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS buyers (id text PRIMARY KEY, created_at timestamptz NOT NULL, buyer jsonb NOT NULL)`,
 ];
 

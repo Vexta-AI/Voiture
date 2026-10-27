@@ -162,3 +162,17 @@ export function normalizeApifyItem(item, context) {
     },
   };
 }
+
+/**
+ * Page d'annonce lue par le scraper de détails : identifiant et description complète.
+ * Les noms de champ varient d'un scraper à l'autre, on accepte les plus courants.
+ * @param {Record<string, any>} item
+ * @returns {{ id: string, description: string } | null}
+ */
+export function detailsFromItem(item) {
+  const raw = item.ad_id ?? item.list_id ?? item.id ?? item.adId ?? String(item.url ?? item.link ?? '').match(/(\d{6,})(?:\D*$)/)?.[1];
+  const id = raw !== undefined && raw !== null ? String(raw).match(/\d{6,}/)?.[0] : null;
+  const text = [item.description, item.body, item.text, item.content].find((v) => typeof v === 'string' && v.trim());
+  if (!id || !text) return null;
+  return { id: `lbc-${id}`, description: String(text).replace(/\s+\n/g, '\n').trim().slice(0, 8000) };
+}

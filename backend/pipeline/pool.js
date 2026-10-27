@@ -32,6 +32,8 @@ export function compactListing(l) {
     lat: l.lat,
     lng: l.lng,
     url: l.url,
+    // Vendeur pro ou particulier : la cote se calcule de préférence sur les particuliers.
+    source: l.source,
     // L'annonce complète (description) n'est pas gardée : l'état « accidentée / en panne » est figé ici.
     damaged: isDamaged(l),
   };

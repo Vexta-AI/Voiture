@@ -6,7 +6,7 @@ import { getDatasetItems, isCapacityError, startRun } from './apify.js';
 import { alertKey, priceListings, selectAlerts, selectVerifyAlerts } from './hunt.js';
 import { distanceKm, filterArea } from './geo.js';
 import { estimateMarketPrice, modelKey, variantOf } from './market.js';
-import { normalizeApifyItem, toInt } from './normalize.js';
+import { detailsFromItem, normalizeApifyItem, toInt } from './normalize.js';
 import { scoreListing } from '../utils/scoring.js';
 import { formatTelegramAlert, formatVerifyAlert, sendTelegram } from './telegram.js';
 import { generateQualificationMessage } from '../utils/messages.js';
@@ -90,6 +90,18 @@ describe('Cote par comparables', () => {
     assert.equal(est?.price, 9000);
     assert.equal(est?.comparables, 5);
     assert.equal(est?.window, 'serré');
+  });
+
+  it('particuliers seulement quand ils suffisent, pros inclus sinon', () => {
+    const target = listing();
+    const priv = comps([8000, 8500, 9000, 9500]);
+    const pros = comps([11000, 11500, 12000]).map((p, i) => ({ ...p, id: `pro-${i}`, source: 'LeBonCoin · Pro' }));
+    const est = estimateMarketPrice(target, [...priv, ...pros]);
+    assert.equal(est?.comparables, 4);
+    assert.ok(est?.criteria.some((c) => c.startsWith('particuliers seulement (3 pro')));
+    const mixed = estimateMarketPrice(target, [...priv.slice(0, 2), ...pros]);
+    assert.equal(mixed?.comparables, 5);
+    assert.ok(mixed?.criteria.includes('pros inclus (pas assez d’annonces de particuliers)'));
   });
 
   it('élargit la fenêtre si besoin, refuse sous 4 comparables', () => {
@@ -540,5 +552,13 @@ describe('Pépites à vérifier (cote peu fiable)', () => {
     assert.equal(url.searchParams.get('text'), 'mini mini');
     assert.equal(url.searchParams.get('regdate'), '2011-2013');
     assert.equal(url.searchParams.get('mileage'), '0-130000');
+  });
+});
+
+describe('Pages d’annonce (scraper de détails)', () => {
+  it('récupère id et description, quel que soit le nom du champ', () => {
+    assert.deepEqual(detailsFromItem({ ad_id: 3279214320, description: 'Distribution faite à 120 000 km.' }), { id: 'lbc-3279214320', description: 'Distribution faite à 120 000 km.' });
+    assert.equal(detailsFromItem({ url: 'https://www.leboncoin.fr/ad/voitures/3020845973', body: 'Carnet complet' })?.id, 'lbc-3020845973');
+    assert.equal(detailsFromItem({ ad_id: 3020845973, description: '' }), null);
   });
 });

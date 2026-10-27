@@ -17,16 +17,18 @@ Légende : ✅ fait · 🔨 en cours · 🟡 attend ton accord · 💡 idée à 
 
 - ✅ Marge calculée en particulier (`BUSINESS.status = 'particulier'`). Dire « passe en micro » une fois l'activité déclarée.
 - ✅ Objectif 1 000 € **net** (pas brut). Budget à partir de 1 500 €, remise en état 350 € sous 5 000 €.
-- 🟡 Nouveaux leviers de négociation : débosselage sans peinture (≈ 80 € réel), disques (≈ 300 €), jante unie (70 € HT).
-- 🟡 Offre « sous 24 h » dans le message de négociation.
-- 🟡 Comparer chaque annonce aux prix des **particuliers** seulement : un pro inclut la garantie, ta revente se fait au prix particulier.
+- ✅ Nouveaux leviers : débosselage sans peinture (−300 €, coût 80 €), disques + plaquettes (−400 €, coût 300 €).
+- 💡 Jante unie à 70 € HT : le type de jante (unie ou bi-ton) ne se lit pas dans l'annonce, on garde 170 € (prudent).
+- ✅ Offre « sous 24 h » dans les messages.
+- ✅ Cote sur les **particuliers** seulement quand ils sont assez nombreux (sinon pros inclus, et c'est écrit dans les critères).
+- 💡 Même règle pour la revente « chez toi » (rayon 100/200 km).
 
 ## Fiabilité, entretien, vendabilité
 
 - ✅ PureTech 1.2 avant 2023 refusé systématiquement. Moteurs à surveiller : THP/Prince, 1.0 EcoBoost, EA111 TSI, BMW N47.
 - ✅ Vendabilité : finition, options, couleur, annonce qui traîne, concurrence à la revente.
 - ✅ Fiche entretien par moteur (45 moteurs) : courroie ou chaîne, échéance selon les sources, points faibles, questions au vendeur. Information seulement, sans effet sur le score.
-- 🟡 Pas de MASTERCLASS pour une finition d'entrée de gamme, ou une annonce classée « risque de traîner ».
+- ✅ Pas de MASTERCLASS pour une finition d'entrée de gamme ou une voiture « risque de traîner ».
 - 💡 Intervalles constructeur : les confirmer sur les carnets (aujourd'hui, sources secondaires « À valider »).
 - 💡 Crit'Air / ZFE : non intégré tant que les sources se contredisent.
 
@@ -34,14 +36,13 @@ Légende : ✅ fait · 🔨 en cours · 🟡 attend ton accord · 💡 idée à 
 
 - ✅ Vendeur pro repéré (annonce leboncoin « Pro ») : rappel garantie, prix clé en main, frais de dossier.
 - ✅ Voitures importées (USA, Japon, Allemagne, UE) : origine, papiers, homologation annoncée déduite, malus, miles, questions au vendeur, jamais MASTERCLASS.
-- ✅ Repérer « vente en l'état », « prix marchand », « réservé aux professionnels » (signalé, sans effet sur le score).
-- 🟡 En faire un « risque » (pas de MASTERCLASS, avertissement), comme accident ou papiers pas en règle.
+- ✅ « Vendu en l'état » compte comme un risque (avertissement, jamais MASTERCLASS).
 - À valider à la main : taux TARIC 8703 (USA, Japon), redevance RTI DREAL, tarif UTAC, délai légal d'un mois.
 
 ## Mandat, dépôt-vente, acheteurs
 
 - ✅ Formulaire acheteurs `/cherche` (validation manuelle), alertes « annonce qui traîne » pour le mandat.
-- 🟡 Formulaire vendeurs pour récupérer des mandats.
+- ✅ Formulaire public `/vendre` : le vendeur laisse sa voiture, la demande arrive dans le CRM (Mandats) avec une alerte Telegram.
 - 💡 Le mandat et le dépôt-vente supposent une activité déclarée : voir un comptable.
 
 ## Inspection photos

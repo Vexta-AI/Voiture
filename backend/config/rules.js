@@ -413,6 +413,9 @@ export const PRICE_SIGNALS = {
     { id: 'debattre', label: 'Prix à débattre', pattern: /a debattre|\bnegociable|faire offre|ouvert a la negociation/ },
   ],
   risks: [
+    // Vente « en l'état » ou réservée aux pros : souvent sans garantie, parfois un défaut non réparé.
+    // Risque ajouté le 27/10/2026 avec l'accord de l'utilisateur (« fait tout »).
+    { id: 'etat', label: "Vendu en l'état / réservé aux pros", pattern: /vendu(e)? en l'etat|vente en l'etat|prix marchand|reserve(e)? aux (pros|professionnels|marchands)|pour (pro|professionnel|marchand)s?\b|export uniquement/ },
     { id: 'accident', label: 'Accident / VGE', pattern: /accidente|\baccident|\bchoc\b|sinistre|redresse|\bvge\b|\bvei\b|\bepave/ },
     { id: 'moteur', label: 'Problème moteur', pattern: /(probleme|souci|bruit|claquement|fumee).{0,30}(moteur|turbo|distribution|injecteur)|joint de culasse|turbo (hs|mort|a changer)|consomme de l'?huile/ },
     { id: 'boite', label: 'Problème boîte / embrayage', pattern: /(probleme|souci|bruit|patine).{0,30}(boite|embrayage)|embrayage (a changer|a faire|hs|qui patine)/ },

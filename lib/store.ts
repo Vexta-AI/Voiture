@@ -235,5 +235,31 @@ export async function findListings(filter: { id?: string; text?: string }, limit
      LIMIT $3`,
     [filter.id ?? null, text, limit],
   );
-  return rows.map((r) => ({ ...r.l, fetchedAt: new Date(r.fetched_at).toISOString(), source: r.source }));
+  return withDetails(rows.map((r) => ({ ...r.l, fetchedAt: new Date(r.fetched_at).toISOString(), source: r.l.source ?? r.source })));
+}
+
+/** Descriptions complètes lues sur la page de l'annonce (scraper de détails). */
+export async function saveDetails(rows: { id: string; description: string }[]) {
+  if (!rows.length) return;
+  await q(
+    `INSERT INTO details (listing_id, fetched_at, data)
+     SELECT e->>'id', now(), e FROM jsonb_array_elements($1::jsonb) e
+     ON CONFLICT (listing_id) DO UPDATE SET fetched_at = now(), data = excluded.data`,
+    [JSON.stringify(rows)],
+  );
+}
+
+export async function loadDetails(ids: string[]) {
+  const map = new Map<string, { description: string }>();
+  if (!ids.length) return map;
+  const rows = await q<{ listing_id: string; data: { description: string } }>(`SELECT listing_id, data FROM details WHERE listing_id = ANY($1)`, [ids]);
+  for (const r of rows) map.set(r.listing_id, r.data);
+  return map;
+}
+
+/** Complète la description des annonces qui en ont une sur leur page (sans écraser celle déjà présente). */
+export async function withDetails<T extends { id: string; description?: string }>(listings: T[]): Promise<T[]> {
+  const ids = listings.filter((l) => !l.description).map((l) => l.id);
+  const details = await loadDetails(ids).catch(() => new Map<string, { description: string }>());
+  return listings.map((l) => (!l.description && details.has(l.id) ? { ...l, description: details.get(l.id)!.description } : l));
 }

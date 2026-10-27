@@ -50,7 +50,7 @@ export async function startRun({ token, source, webhookUrl, webhookSecret, maxCh
     webhooks: Buffer.from(JSON.stringify(webhooks)).toString('base64'),
     maxTotalChargeUsd: String(maxChargeUsd),
   });
-  const { data } = await apify(`/acts/${APIFY_ACTOR_ID}/runs?${query}`, { token, method: 'POST', body: actorInput(source), fetchImpl });
+  const { data } = await apify(`/acts/${source.actorId ?? APIFY_ACTOR_ID}/runs?${query}`, { token, method: 'POST', body: actorInput(source), fetchImpl });
   return { runId: data.id, status: data.status };
 }
 

@@ -625,9 +625,6 @@ export function scoreListing(listing, options = {}) {
   // --- Pourquoi ce prix ? & MASTERCLASS ---
   const why = priceReasons(listing, text, online, now);
   const quality = qualitySignals(text);
-  // « En l'état » / réservé aux pros : information seulement (ni score ni marge, en attente d'accord pour en faire un risque).
-  const asIs = findPattern(text, /vendu(e)? en l'etat|vente en l'etat|prix marchand|reserve(e)? aux (pros|professionnels|marchands)|pour (pro|professionnel|marchand)s?\b|export uniquement/);
-  if (asIs) insights.push(`Annonce « en l'état » ou réservée aux pros (« ${asIs} ») : souvent sans garantie, parfois un défaut non réparé. Demande pourquoi.`);
   // Fiche entretien du moteur : information seulement (ni score ni marge).
   const maintenance = listing.type === 'auto' ? maintenanceSummary(listing, text, quality.hits.some((h) => h.id === 'distribution')) : null;
   if (maintenance) {
@@ -669,8 +666,13 @@ export function scoreListing(listing, options = {}) {
   if (confidence?.level === 'faible' && status.key === 'PEPITE') {
     warnings.push(`Cote peu fiable (${listing.marketStats?.comparables} comparables, prix dispersés à ${confidence.spreadPct} %) : vérifie les annonces comparées avant de bouger. Pas d'alerte.`);
   }
+  const sale = sellability(listing, { triggers, daysOnline: online, reliability: warnings.filter((w) => w.startsWith('Fiabilité')) });
   const masterclass =
     status.key === 'PEPITE' &&
+    // Revente : pas de MASTERCLASS sur une finition d'entrée de gamme ou une voiture qui risque de traîner
+    // (accord de l'utilisateur le 27/10/2026 : la Golf mal finie, le CLA sans toit ouvrant).
+    sale.trim?.tier !== 'entree' &&
+    sale.level !== 'difficile' &&
     // Import : papiers et malus pas encore chiffrés, jamais MASTERCLASS.
     !imported &&
     // MASTERCLASS : seulement sur une cote très fiable.
@@ -716,7 +718,7 @@ export function scoreListing(listing, options = {}) {
     imported,
     maintenance,
     priceReasons: why,
-    sellability: sellability(listing, { triggers, daysOnline: online, reliability: warnings.filter((w) => w.startsWith('Fiabilité')) }),
+    sellability: sale,
     quality,
     prudent: { margin: prudentMargin, buyerDiscount, slowDays, isEv },
     local: local && localMargin !== null ? { ...local, margin: localMargin } : null,
