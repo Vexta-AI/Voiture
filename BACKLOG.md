@@ -45,6 +45,11 @@ Légende : ✅ fait · 🔨 en cours · 🟡 attend ton accord · 💡 idée à 
 - ✅ Formulaire public `/vendre` : le vendeur laisse sa voiture, la demande arrive dans le CRM (Mandats) avec une alerte Telegram.
 - 💡 Le mandat et le dépôt-vente supposent une activité déclarée : voir un comptable.
 
+## Vendre (ta voiture ou ton stock)
+
+- ✅ Page `/vente` : prix d'affichage (cote + 5 % de négo, ou prix ferme), plancher (quart bas des comparables), annonce honnête (chaque entretien avec sa preuve, repeinte dite), réponses types, papiers (CT < 6 mois, cession, non-gage, ANTS sous 15 jours).
+- 💡 Enregistrer la vente dans le CRM (stock « En vente ») et suivre les acheteurs.
+
 ## Inspection photos
 
 - ✅ Check-list gratuite. L'IA (clé Anthropic) ne se lance que sur un clic.

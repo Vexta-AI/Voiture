@@ -216,6 +216,9 @@ export function Dashboard({ initialListings, pending = [], radar }: { initialLis
             <Link href="/crm" className="btn-secondary">
               CRM
             </Link>
+            <Link href="/vente" className="btn-secondary">
+              Vendre
+            </Link>
             <button type="button" className="btn-primary" onClick={() => setAnalyzerOpen(true)}>
               + Analyser<span className="hidden sm:inline"> une annonce</span>
             </button>
